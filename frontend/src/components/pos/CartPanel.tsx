@@ -617,7 +617,7 @@ export default function CartPanel({
         </div>
         <div className="flex justify-between mb-4 text-lg">
           <span className="font-semibold text-foreground">{t('subtotal')}</span>
-          <span className="font-bold text-brand">{fmt(cart.subtotal())}</span>
+          <span className="font-bold text-foreground tabular-nums">{fmt(cart.subtotal())}</span>
         </div>
         {(appliedCharges.length > 0 || addableCharges.length > 0) && (
           <div className="mb-4 space-y-1" data-testid="cart-charges">
@@ -701,7 +701,7 @@ export default function CartPanel({
             onClick={onPlaceOrder}
             disabled={submitting || cart.items.length === 0}
             className="flex-1"
-            size="lg"
+            size="pos"
           >
             {submitting ? t('placing') : t('placeOrderButton')}
             {!submitting && (

@@ -60,6 +60,11 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
     next();
     return;
   }
+  // CFR OS public endpoints (health, dietary check, guest menu)
+  if (reqPath.startsWith('/api/cfr')) {
+    next();
+    return;
+  }
   // Auth routes handle their own token verification. Matched with a trailing
   // slash so this doesn't also swallow /api/authorization, which relies on
   // this middleware to populate req.user before its own permission gate runs.

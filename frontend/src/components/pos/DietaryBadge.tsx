@@ -5,6 +5,7 @@ import { useTranslations, type AppConfig } from 'use-intl';
 function normalizeTag(raw: string): string {
   const s = raw.toLowerCase().replace(/[\s\-_]+/g, '');
   if (s === 'nonveg' || s === 'nonvegetarian' || s === 'nonveg.')  return 'non_veg';
+  if (s === 'eggless')                                             return 'eggless';
   if (s === 'veg' || s === 'vegetarian' || s === 'veg.')           return 'veg';
   if (s === 'vegan')                                               return 'vegan';
   if (s === 'egg' || s === 'eggetarian')                           return 'egg';
@@ -24,6 +25,7 @@ function normalizeTag(raw: string): string {
 // Tag config: known tags get colours, unknown tags get a neutral style
 const TAG_CONFIG: Record<string, { color: string; bg: string; dot: string }> = {
   // Food / dietary
+  eggless:       { color: 'text-sage',                         bg: 'bg-accent border border-latte/50',   dot: 'bg-latte' },
   veg:           { color: 'text-green-700 dark:text-green-300',   bg: 'bg-green-100 dark:bg-green-950/40',   dot: 'bg-green-600 dark:bg-green-400' },
   vegan:         { color: 'text-emerald-700 dark:text-emerald-300', bg: 'bg-emerald-100 dark:bg-emerald-950/40', dot: 'bg-emerald-600 dark:bg-emerald-400' },
   egg:           { color: 'text-yellow-700 dark:text-yellow-300',  bg: 'bg-yellow-100 dark:bg-yellow-950/40',  dot: 'bg-yellow-500 dark:bg-yellow-400' },

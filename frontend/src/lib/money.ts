@@ -32,3 +32,22 @@ export function allocateEqualShares(totalMinor: number, count: number): number[]
   const remainder = totalMinor % count;
   return Array.from({ length: count }, (_, index) => (index < remainder ? quotient + 1 : quotient));
 }
+
+/**
+ * CFR OS: formats integer paise to Indian Rupee string with symbol.
+ * Example: rupees(48300, 2) -> "₹483.00"
+ */
+export const rupees = (paise: number, digits = 0) =>
+  '₹' +
+  new Intl.NumberFormat('en-IN', {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(paise / 100);
+
+/**
+ * CFR OS: Calculates 5% GST (2.5% CGST + 2.5% SGST) from integer paise subtotal.
+ */
+export function gst(subtotalPaise: number) {
+  const cgst = Math.round((subtotalPaise * 25) / 1000); // 2.5%
+  return { cgst, sgst: cgst, total: subtotalPaise + cgst * 2 };
+}

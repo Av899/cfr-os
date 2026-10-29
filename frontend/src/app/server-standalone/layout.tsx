@@ -1,10 +1,16 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { Montserrat } from 'next/font/google';
 import '../globals.css';
 import { DirectionalToaster } from '@/components/layout/DirectionalToaster';
 import { KdsHtmlLang } from '@/components/kds/KdsHtmlLang';
 
-const inter = Inter({ subsets: ['latin'] });
+const montserrat = Montserrat({
+  subsets: ['latin'],
+  weight: ['300', '400', '500', '600', '700'],
+  variable: '--font-montserrat',
+  display: 'swap',
+  preload: false,
+});
 
 export const metadata: Metadata = {
   title: 'Flo Server App',
@@ -17,8 +23,8 @@ export default function ServerStandaloneLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning className="h-full">
-      <body className={`${inter.className} h-full bg-slate-50 dark:bg-background`}>
+    <html lang="en" suppressHydrationWarning className="dark h-full">
+      <body className={`${montserrat.variable} font-sans h-full bg-background text-foreground`}>
         <KdsHtmlLang />
         <DirectionalToaster />
         {children}

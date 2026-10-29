@@ -5,45 +5,74 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --font-sans: "Geist", "Noto Sans Devanagari", "Nirmala UI", "Kohinoor Devanagari", "Devanagari Sangam MN", system-ui, sans-serif;
-  --font-mono: "Geist Mono", monospace;
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  /* Semantic surfaces: new UI uses these instead of raw gray or indigo
-   * utilities. Existing raw-color usage migrates only when that page is
-   * already being touched, not as a standalone sweep. */
+  --font-sans: var(--font-montserrat), "Noto Sans Devanagari", "Nirmala UI", "Kohinoor Devanagari", "Devanagari Sangam MN", system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --radius: 0.875rem;
+
+  /* ───────── CFR OS Brand Tokens ───────── */
+  --espresso: #1E1B16;
+  --roast: #8B5E3C;
+  --latte: #C9A782;
+  --cream: #F6F4ED;
+  --sage: #4A5A4A;
+
+  /* ───────── CFR OS Day Tokens (Cream ground) ───────── */
+  --background: #F6F4ED;
+  --foreground: #1E1B16;
+  --card: #FBFAF6;
+  --card-foreground: #1E1B16;
+  --popover: #FBFAF6;
+  --popover-foreground: #1E1B16;
+  --primary: #1E1B16;
+  --primary-foreground: #F6F4ED;
+  --secondary: #EFE8DD;
+  --secondary-foreground: #1E1B16;
+  --muted: #E9E7E0;
+  --muted-foreground: #6F4A2F;
+  --accent: #EFE8DD;
+  --accent-foreground: #1E1B16;
+  --destructive: #A8402B;
+  --destructive-foreground: #F6F4ED;
+  --border: #DCDAD3;
+  --input: #C6C4BE;
+  --ring: #4A5A4A;
+
+  --success: #4A5A4A;
+  --warning: #8A5A12;
+
+  /* CFR Status tokens */
+  --status-new: #C9A782;
+  --status-prep: #8B5E3C;
+  --status-ready: #4A5A4A;
+  --status-attn: #8A5A12;
+  --status-late: #A8402B;
+
+  /* Surfaces & paper */
+  --bg-raised: #FBFAF6;
+  --bg-sunken: #E9E7E0;
+  --wash: #EFE8DD;
+  --shadow-raised: 0 1px 0 rgba(30,27,22,.04), 0 10px 28px -14px rgba(30,27,22,.22);
+  --shadow-overlay: 0 26px 60px -22px rgba(30,27,22,.38);
+  --paper: radial-gradient(120% 60% at 15% 0%,rgba(255,255,255,.55),rgba(255,255,255,0) 60%),repeating-linear-gradient(0deg,rgba(30,27,22,.014) 0 1px,transparent 1px 3px),repeating-linear-gradient(90deg,rgba(30,27,22,.010) 0 1px,transparent 1px 4px);
+
+  /* Semantic surfaces */
   --panel: var(--card);
-  --selected-row: #e8ebff;
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: #3248FF;
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: #e8ebff;
-  --sidebar-accent-foreground: #3248FF;
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: #3248FF;
+  --selected-row: #EFE8DD;
+  --chart-1: #8B5E3C;
+  --chart-2: #C9A782;
+  --chart-3: #4A5A4A;
+  --chart-4: #8A5A12;
+  --chart-5: #A8402B;
+
+  /* Sidebar (CFR Rail) */
+  --sidebar: #1E1B16;
+  --sidebar-foreground: #F6F4ED;
+  --sidebar-primary: #C9A782;
+  --sidebar-primary-foreground: #1E1B16;
+  --sidebar-accent: #2B2823;
+  --sidebar-accent-foreground: #C9A782;
+  --sidebar-border: #2B2823;
+  --sidebar-ring: #C9A782;
 
   /* Hoisted to :root so fixed app chrome can offset below the title bar;
    * consumed by both .flo-title-bar and the sidebar inset rules below. */
@@ -54,6 +83,19 @@
 
 body {
   font-family: var(--font-sans);
+  background-image: var(--paper);
+}
+
+* {
+  transition: background-color 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+              color 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+              border-color 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
 }
 
 /* Custom +/- controls exist next to numeric fields throughout the POS UI;
@@ -413,55 +455,89 @@ div:hover > .flo-toast-drain,
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  /* Brand colors */
-  --color-brand: #3248FF;
-  --color-brand-light: #e8ebff;
-  --color-brand-hover: #2538d4;
-  --color-brand-ring: #3248FF80;
-  --color-success: #00cc61;
-  --color-success-light: #dcfce7;
-  --color-success-hover: #00b355;
+  /* CFR Brand colors */
+  --color-brand-espresso: var(--espresso);
+  --color-brand-roast: var(--roast);
+  --color-brand-latte: var(--latte);
+  --color-brand-cream: var(--cream);
+  --color-brand-sage: var(--sage);
+
+  /* Brand / legacy utility compatibility mapped to CFR palette */
+  --color-brand: var(--primary);
+  --color-brand-light: var(--wash);
+  --color-brand-hover: var(--roast);
+  --color-brand-ring: var(--ring);
+  --color-success: var(--success);
+  --color-success-light: var(--wash);
+  --color-success-hover: var(--sage);
+
+  /* Status */
+  --color-status-new: var(--status-new);
+  --color-status-prep: var(--status-prep);
+  --color-status-ready: var(--status-ready);
+  --color-status-attn: var(--status-attn);
+  --color-status-late: var(--status-late);
 }
 
 .dark {
-  --background: oklch(0.17 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.22 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.22 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.28 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.28 0 0);
-  --muted-foreground: oklch(0.75 0 0);
-  --accent: oklch(0.28 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 18%);
-  --ring: oklch(0.556 0 0);
-  --panel: var(--card);
-  --selected-row: oklch(0.24 0.03 264);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: #6366f1;
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.28 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 12%);
-  --sidebar-ring: #6366f1;
+  /* ───────── CFR OS Night Tokens (Espresso ground) ───────── */
+  --background: #1E1B16;
+  --foreground: #F6F4ED;
+  --card: #2B2823;
+  --card-foreground: #F6F4ED;
+  --popover: #2B2823;
+  --popover-foreground: #F6F4ED;
+  --primary: #C9A782;
+  --primary-foreground: #1E1B16;
+  --secondary: #362F25;
+  --secondary-foreground: #F6F4ED;
+  --muted: #151310;
+  --muted-foreground: #B1AFA8;
+  --accent: #362F25;
+  --accent-foreground: #F6F4ED;
+  --destructive: #E08A74;
+  --destructive-foreground: #1E1B16;
+  --border: #3C3934;
+  --input: #524F4A;
+  --ring: #C9A782;
 
-  /* Brand surface for bg-brand-light in dark mode. Note: text-brand (#3248FF)
-   * has limited contrast on this surface; components using bg-brand-light with
-   * text-brand should add dark:text-indigo-300 for legibility. */
-  --color-brand-light: oklch(0.20 0.03 270);
+  --success: #8FA58F;
+  --warning: #D9A441;
+
+  /* Status tokens (Night) */
+  --status-new: #C9A782;
+  --status-prep: #8B5E3C;
+  --status-ready: #8FA58F;
+  --status-attn: #D9A441;
+  --status-late: #E08A74;
+
+  /* Surfaces & paper (Night) */
+  --bg-raised: #2B2823;
+  --bg-sunken: #151310;
+  --wash: #362F25;
+  --shadow-raised: 0 1px 0 rgba(0,0,0,.3), 0 10px 28px -14px rgba(0,0,0,.6);
+  --shadow-overlay: 0 26px 60px -22px rgba(0,0,0,.7);
+  --paper: radial-gradient(120% 60% at 15% 0%,rgba(201,167,130,.07),rgba(201,167,130,0) 60%);
+
+  --panel: var(--card);
+  --selected-row: #362F25;
+  --chart-1: #C9A782;
+  --chart-2: #8B5E3C;
+  --chart-3: #8FA58F;
+  --chart-4: #D9A441;
+  --chart-5: #E08A74;
+
+  /* Sidebar (CFR Rail, Night) */
+  --sidebar: #151310;
+  --sidebar-foreground: #F6F4ED;
+  --sidebar-primary: #C9A782;
+  --sidebar-primary-foreground: #1E1B16;
+  --sidebar-accent: #2B2823;
+  --sidebar-accent-foreground: #C9A782;
+  --sidebar-border: #3C3934;
+  --sidebar-ring: #C9A782;
+
+  --color-brand-light: #362F25;
 }
 
 html.dark::-webkit-scrollbar-thumb,

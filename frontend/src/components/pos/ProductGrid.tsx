@@ -41,11 +41,11 @@ function CategoryChip({
     <button
       onClick={onSelect}
       title={categoryName}
-      className={`max-w-56 truncate px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+      className={`max-w-56 truncate px-4.5 py-2 min-h-[44px] rounded-full text-sm font-semibold tracking-[0.03em] whitespace-nowrap transition-all ${
         isSelected
           ? colorClasses
             ? `${colorClasses.activeBg} ${colorClasses.activeText}`
-            : 'bg-brand text-white'
+            : 'bg-primary text-primary-foreground border border-primary'
           : colorClasses
             ? `${colorClasses.bg} ${colorClasses.text} border ${colorClasses.border} hover:opacity-80`
             : 'bg-card text-foreground border border-border hover:bg-muted'
@@ -81,9 +81,9 @@ function CategoryRow({
     <button
       onClick={() => setSelectedCategory(null)}
       title={collapse ? allLabel : undefined}
-      className={`${collapse ? 'min-w-0 truncate ' : ''}px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+      className={`${collapse ? 'min-w-0 truncate ' : ''}px-4.5 py-2 min-h-[44px] rounded-full text-sm font-semibold tracking-[0.03em] whitespace-nowrap transition-all ${
         !selectedCategory
-          ? 'bg-brand text-white'
+          ? 'bg-primary text-primary-foreground border border-primary'
           : 'bg-card text-foreground border border-border hover:bg-muted'
       }`}
     >
@@ -482,23 +482,23 @@ export default function ProductGrid({
                   if (!validateSelectionQuantity(product, quantity)) return;
                   onProductClick(product, quantity);
                 }}
-                className="min-h-36 bg-card rounded-xl p-2.5 border border-border hover:border-brand/40 active:border-brand active:bg-muted/40 hover:shadow-md transition-all text-start relative cursor-pointer overflow-hidden touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-50 disabled:cursor-not-allowed"
+                className="min-h-36 bg-card rounded-[14px] p-3 border border-border hover:border-primary/40 active:border-primary active:bg-muted/40 shadow-[var(--shadow-raised)] transition-all text-start relative cursor-pointer overflow-hidden touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {!!product.track_inventory && (
                   <>
                     {product.stock_quantity <= 0 ? (
-                      <span className="absolute top-2 start-2 bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300 text-[10px] font-bold px-2 py-0.5 rounded-full z-10 shadow-sm border border-red-200 dark:border-red-800/40 pointer-events-none">
+                      <span className="absolute top-2 start-2 bg-destructive/15 text-destructive text-[10px] font-bold px-2 py-0.5 rounded-full z-10 border border-destructive/30 pointer-events-none">
                         {t('outOfStock')}
                       </span>
                     ) : product.stock_quantity <= (product.low_stock_threshold || 0) ? (
-                      <span className="absolute top-2 start-2 bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 text-[10px] font-bold px-2 py-0.5 rounded-full z-10 shadow-sm border border-orange-200 dark:border-orange-800/40 pointer-events-none">
+                      <span className="absolute top-2 start-2 bg-warning/15 text-warning text-[10px] font-bold px-2 py-0.5 rounded-full z-10 border border-warning/30 pointer-events-none">
                         {t('lowStock')}
                       </span>
                     ) : null}
                   </>
                 )}
                 {inCartQty > 0 && (
-                  <span className="absolute top-0 end-0 bg-brand text-white text-xs w-6 h-6 rounded-es-lg flex items-center justify-center font-bold z-10">
+                  <span className="absolute top-0 end-0 bg-primary text-primary-foreground text-xs w-6 h-6 rounded-es-lg flex items-center justify-center font-bold z-10 tabular-nums">
                     {inCartQty}
                   </span>
                 )}
@@ -535,11 +535,11 @@ export default function ProductGrid({
                   </div>
                 )}
 
-                <h3 className="font-medium text-foreground text-sm line-clamp-2 leading-snug">
+                <h3 className="font-semibold text-foreground text-sm line-clamp-2 leading-snug">
                   {product.name}
                 </h3>
                 <div className="flex items-center justify-between mt-1">
-                  <p className="text-brand font-bold">{fmt(Number(product.price))}</p>
+                  <p className="text-foreground font-bold tabular-nums">{fmt(Number(product.price))}</p>
                   <div className="flex items-center gap-1 shrink-0">
                     {!showProductImages && product.tags && product.tags.length > 0 && (
                       <TagBadge tag={product.tags[0]} />

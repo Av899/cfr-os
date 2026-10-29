@@ -369,7 +369,7 @@ export default function CustomerSearch({
             data-testid="pos-customer-select-btn"
             className="touch-target flex-1 min-w-0 justify-start gap-2 text-start cursor-pointer"
           >
-            <span className="font-medium text-brand dark:text-indigo-300 truncate">
+            <span className="font-semibold text-foreground truncate">
               {customer.name}
             </span>
             {customer.phone && (
@@ -377,18 +377,18 @@ export default function CustomerSearch({
                 <Ltr>{customer.phone}</Ltr>
               </span>
             )}
-            <Pencil size={14} className="text-brand/60 dark:text-indigo-300 shrink-0" />
+            <Pencil size={14} className="text-muted-foreground shrink-0" />
           </button>
           <button
             onClick={handleClear}
-            className="touch-target rounded-full text-brand dark:text-indigo-300 hover:text-brand-hover active:bg-card/60 ms-2 shrink-0 cursor-pointer"
+            className="touch-target rounded-full text-foreground hover:text-destructive active:bg-card/60 ms-2 shrink-0 cursor-pointer"
             aria-label={t('remove')}
           >
             <X size={16} />
           </button>
         </div>
         {!!loyaltyPoints && loyaltyPoints > 0 && (
-          <span className="inline-flex items-center gap-0.5 text-xs font-medium text-brand dark:text-indigo-300 bg-brand-light dark:bg-[var(--color-brand-light)] rounded-full px-1.5 py-0.5">
+          <span className="inline-flex items-center gap-0.5 text-xs font-semibold text-primary bg-accent rounded-full px-2 py-0.5 border border-border">
             <Gift size={11} />
             {t('loyaltyPointsShort', { count: loyaltyPoints })}
           </span>
@@ -433,7 +433,7 @@ export default function CustomerSearch({
           }}
           onKeyDown={handleKeyDown}
           placeholder={tOrders('searchCustomer')}
-          className={`w-full ps-9 pe-8 text-sm border border-border bg-card rounded-lg focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-colors ${
+          className={`w-full ps-9 pe-8 text-sm border border-border bg-card rounded-full focus:ring-2 focus:ring-ring focus:border-ring outline-none transition-all ${
             isTopbar ? 'h-10' : 'min-h-11 py-2'
           }`}
           aria-label={tOrders('searchCustomer')}

@@ -24,6 +24,7 @@ import {
   Boxes,
   Receipt,
   Lock,
+  Sparkles,
   type LucideIcon,
 } from 'lucide-react';
 import { useTranslations, type AppConfig } from 'use-intl';
@@ -351,6 +352,12 @@ export default function AppSidebar() {
                 align={isMobile ? 'end' : 'start'}
                 className="w-56 rounded-lg"
               >
+                <DropdownMenuItem asChild className="cursor-pointer">
+                  <Link href="/design-system" onClick={closeMobile} className="flex items-center gap-2">
+                    <Sparkles className="size-4 shrink-0 text-sidebar-primary" />
+                    <span>CFR OS Design System</span>
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuItem asChild className="cursor-pointer">
                   <Link href="/support" onClick={closeMobile} className="flex items-center gap-2">
                     <LifeBuoy className="size-4 shrink-0" />

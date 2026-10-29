@@ -2357,8 +2357,8 @@ export default function PaymentModal({
                       !(kitchenApproverId ?? managerApprovers.selectedApproverId)),
                   )
                 }
-                className="w-full"
-                size="lg"
+                className="w-full text-base font-semibold"
+                size="pos"
               >
                 {processing
                   ? t('processingPayment')

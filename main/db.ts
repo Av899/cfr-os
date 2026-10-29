@@ -19,6 +19,7 @@ import {
   utcDayBounds,
 } from '../shared/business-date';
 import { getCurrencyFractionDigits, resolveRegionalSnapshot } from './countries';
+import { runCfrMigrations } from './cfr/db/migrator';
 
 const USER_ROLE_SQL_CHECK = `CHECK (role IN (${ROLE_KEYS.map((role) => `'${role}'`).join(', ')}))`;
 
@@ -1458,6 +1459,7 @@ export function initDatabase(
   repairSequences();
   autoRepairPaymentDetails();
   autoRepairDefaultPrinter();
+  runCfrMigrations(db);
 
   if (app.isPackaged && !process.env.FLO_E2E_DB_PATH) {
     const markerPath = getDbInitializedMarkerPath();

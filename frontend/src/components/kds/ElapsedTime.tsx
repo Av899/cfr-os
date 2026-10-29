@@ -24,5 +24,5 @@ export function ElapsedTime({ dateStr }: { dateStr: string }) {
     return () => clearInterval(id);
   }, []);
 
-  return <span>{formatElapsed(dateStr)}</span>;
+  return <span className="tabular-nums font-mono font-semibold">{formatElapsed(dateStr)}</span>;
 }

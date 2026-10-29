@@ -82,11 +82,11 @@ export default function PosTopbar({
               type="button"
               onClick={onShowTablePicker}
               data-testid="cart-table-button"
-              className="touch-target shrink-0 gap-2 rounded-lg border border-border bg-card ps-1.5 pe-3 text-sm font-semibold text-foreground transition-colors hover:bg-muted active:bg-muted whitespace-nowrap"
+              className="touch-target shrink-0 gap-2 rounded-full border border-border bg-card ps-1.5 pe-3.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted active:bg-muted whitespace-nowrap"
               title={t('selectTable')}
               aria-label={tableName ? t('tableLabel', { name: tableName }) : t('selectTable')}
             >
-              <span className="flex size-8 items-center justify-center rounded-md bg-yellow-400 text-yellow-950">
+              <span className="flex size-8 items-center justify-center rounded-full bg-accent text-foreground">
                 <UtensilsCrossed size={16} />
               </span>
               <span className="text-base font-bold tabular-nums">{tableName ?? '—'}</span>
@@ -106,7 +106,7 @@ export default function PosTopbar({
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="touch-target shrink-0 rounded-lg border border-border bg-card px-3 text-muted-foreground transition-colors hover:bg-muted active:bg-muted"
+                className="touch-target shrink-0 rounded-full border border-border bg-card px-3.5 text-muted-foreground transition-colors hover:bg-muted active:bg-muted"
                 title={t('moreActions')}
                 aria-label={t('moreActions')}
               >
@@ -150,7 +150,7 @@ export default function PosTopbar({
             onClick={() => {
               void lock();
             }}
-            className="touch-target shrink-0 rounded-lg border border-border bg-card px-3 text-muted-foreground transition-colors hover:bg-muted active:bg-muted"
+            className="touch-target shrink-0 rounded-full border border-border bg-card px-3.5 text-muted-foreground transition-colors hover:bg-muted active:bg-muted"
             title={t('lockTerminal')}
             aria-label={t('lockTerminal')}
           >
@@ -159,7 +159,7 @@ export default function PosTopbar({
           <button
             type="button"
             onClick={onToggleFullscreen}
-            className="touch-target shrink-0 rounded-lg border border-border bg-card px-3 text-muted-foreground transition-colors hover:bg-muted active:bg-muted"
+            className="touch-target shrink-0 rounded-full border border-border bg-card px-3.5 text-muted-foreground transition-colors hover:bg-muted active:bg-muted"
             title={fullscreen ? t('exitFullscreen') : t('enterFullscreen')}
             aria-label={fullscreen ? t('exitFullscreen') : t('enterFullscreen')}
           >

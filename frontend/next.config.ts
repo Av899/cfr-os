@@ -34,6 +34,16 @@ const nextConfig: NextConfig = {
       '@countries': '../main/countries.ts',
     },
   },
+
+  async rewrites() {
+    if (isDesktop) return [];
+    return [
+      {
+        source: '/api/:path*',
+        destination: 'http://localhost:3001/api/:path*',
+      },
+    ];
+  },
 };
 
 export default nextConfig;

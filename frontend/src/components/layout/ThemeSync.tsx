@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useThemeMode, THEME_REHYDRATION_EVENT } from '@/store/theme';
 import type { ThemeMode } from '@/store/theme';
 import api from '@/lib/api';
+import { venueTheme } from '@/lib/venue-theme';
 
 const THEME_MIRROR_KEY = 'flo-theme-resolved';
 const RETRY_DELAY_MS = 1000;
@@ -161,7 +162,9 @@ export function ThemeSync() {
         : null;
 
     const apply = () => {
-      const isDark = mode === 'dark' || (mode === 'system' && Boolean(media?.matches));
+      const isDark =
+        mode === 'dark' ||
+        (mode === 'system' && (venueTheme() === 'dark' || Boolean(media?.matches)));
       html.classList.toggle('dark', isDark);
       if (window.electronAPI || authoritative.current) {
         try {
@@ -175,9 +178,13 @@ export function ThemeSync() {
     };
 
     apply();
-    if (mode !== 'system' || !media) return;
-    media.addEventListener('change', apply);
-    return () => media.removeEventListener('change', apply);
+    if (mode !== 'system') return;
+    const interval = setInterval(apply, 60_000);
+    if (media) media.addEventListener('change', apply);
+    return () => {
+      clearInterval(interval);
+      if (media) media.removeEventListener('change', apply);
+    };
   }, [mode, hydrated]);
 
   return null;

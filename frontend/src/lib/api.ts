@@ -95,8 +95,14 @@ export async function captureClientOperationFailure(input: {
 }
 
 // Base URL derived from window.location.origin so LAN clients connect to host IP.
+// In dev server (port 3000), route directly to Express API backend on port 3001.
 const api = axios.create({
-  baseURL: typeof window !== 'undefined' ? `${window.location.origin}/api` : '/api',
+  baseURL:
+    typeof window !== 'undefined'
+      ? window.location.port === '3000'
+        ? `${window.location.protocol}//${window.location.hostname}:3001/api`
+        : `${window.location.origin}/api`
+      : 'http://localhost:3001/api',
   headers: {
     'Content-Type': 'application/json',
     Accept: 'application/json',

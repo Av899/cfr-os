@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Suspense } from 'react';
-import { Geist, Geist_Mono } from 'next/font/google';
+import { Montserrat } from 'next/font/google';
 import './globals.css';
 import MenuActionHandler from '@/components/layout/MenuActionHandler';
 import AuthGuard from '@/components/layout/AuthGuard';
@@ -12,16 +12,11 @@ import DesktopDragSurface from '@/components/layout/DesktopDragSurface';
 import { I18nProvider } from '@/components/providers/I18nProvider';
 import { PostHogBootstrap } from '@/components/analytics/PostHogBootstrap';
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
+const montserrat = Montserrat({
   subsets: ['latin'],
-  // Avoid font preload warnings on standalone routes that initially render without text.
-  preload: false,
-});
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
+  weight: ['300', '400', '500', '600', '700'],
+  variable: '--font-montserrat',
+  display: 'swap',
   preload: false,
 });
 
@@ -44,7 +39,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#3248FF',
+  themeColor: '#1E1B16',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
@@ -73,7 +68,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body className={`${montserrat.variable} font-sans antialiased`}>
         <Suspense fallback={null}>
           <PostHogBootstrap />
         </Suspense>
