@@ -158,6 +158,72 @@ async function run() {
   const finalIngRes = await request(baseUrl, 'GET', '/api/cfr/ingredients');
   assert(finalIngRes.data?.total === ingRes.data?.total + 1, `Total is exactly previous + 1 (got ${finalIngRes.data?.total})`);
 
+  console.log('\n--- Testing POST /api/cfr/invoices/preview (Golden Fixture) ---');
+  const previewRes = await request(baseUrl, 'POST', '/api/cfr/invoices/preview', {
+    items: [
+      { name: 'Melbourne Magic', rate_paise: 23000, quantity: 1 },
+      { name: 'Pistachio Croissant', rate_paise: 22000, quantity: 1 },
+    ],
+  });
+  assert(previewRes.status === 200, 'Invoice preview returns 200');
+  assert(previewRes.data?.taxable_subtotal === 45000, 'Preview taxable subtotal is ₹450.00 (45,000 paise)');
+  assert(previewRes.data?.gst_breakdown?.cgst_paise === 1125, 'Preview CGST is ₹11.25');
+  assert(previewRes.data?.gst_breakdown?.sgst_paise === 1125, 'Preview SGST is ₹11.25');
+  assert(previewRes.data?.gst_breakdown?.round_off_paise === 50, 'Preview round-off is +₹0.50');
+  assert(previewRes.data?.gst_breakdown?.payable_paise === 47300, 'Preview Net Payable is strictly ₹473.00 (47,300 paise)');
+
+  console.log('\n--- Testing POST /api/cfr/invoices/preview (Invalid Price Increment) ---');
+  const invalidPreviewRes = await request(baseUrl, 'POST', '/api/cfr/invoices/preview', {
+    items: [
+      { name: 'Invalid Item', rate_paise: 23500, quantity: 1 },
+    ],
+  });
+  assert(invalidPreviewRes.status === 400, 'Invalid price increment returns 400 Bad Request');
+  assert(invalidPreviewRes.data?.code === 'ERR_CFR_INVALID_PRICE_INCREMENT', 'Error code is ERR_CFR_INVALID_PRICE_INCREMENT');
+
+  console.log('\n--- Testing POST /api/cfr/invoices/issue ---');
+  const issueRes = await request(baseUrl, 'POST', '/api/cfr/invoices/issue', {
+    order_id: 'ord_live_test_001',
+    taxable_paise: 45000,
+    payment_method: 'UPI_DYNAMIC',
+    payment_ref: 'UPI_REF_987654321',
+  });
+  assert(issueRes.status === 201, 'Issue invoice returns 201 Created');
+  assert(issueRes.data?.invoice?.invoice_number?.startsWith('CFR/'), 'Invoice number begins with CFR/');
+  assert(issueRes.data?.invoice?.payable_paise === 47300, 'Issued invoice payable is ₹473.00');
+  const issuedInvId = issueRes.data?.invoice?.id;
+
+  console.log('\n--- Testing GET /api/cfr/invoices ---');
+  const listInvRes = await request(baseUrl, 'GET', '/api/cfr/invoices');
+  assert(listInvRes.status === 200, 'List invoices returns 200');
+  assert(listInvRes.data?.total >= 1, 'Invoices list contains at least 1 invoice');
+
+  console.log('\n--- Testing GET /api/cfr/invoices/:id ---');
+  const getInvRes = await request(baseUrl, 'GET', `/api/cfr/invoices/${issuedInvId}`);
+  assert(getInvRes.status === 200, 'Fetch single invoice returns 200');
+  assert(getInvRes.data?.invoice?.id === issuedInvId, 'Fetched invoice matches ID');
+  assert(getInvRes.data?.gst?.payable_paise === 47300, 'GST breakdown matches invoice');
+
+  console.log('\n--- Testing GET /api/cfr/invoices/:id/receipt-text ---');
+  const receiptRes = await fetch(`${baseUrl}/api/cfr/invoices/${issuedInvId}/receipt-text`);
+  const receiptBody = await receiptRes.text();
+  assert(receiptRes.status === 200, 'Receipt text endpoint returns 200');
+  assert(receiptBody.includes('COFFEE FIRST RITUAL'), 'Receipt text has COFFEE FIRST RITUAL header');
+  assert(receiptBody.includes('₹473.00'), 'Receipt text has ₹473.00 total');
+  assert(receiptBody.includes('100% ARTISANAL EGGLESS'), 'Receipt text has eggless footer');
+
+  console.log('\n--- Testing POST /api/cfr/invoices/:id/void ---');
+  const voidRes = await request(baseUrl, 'POST', `/api/cfr/invoices/${issuedInvId}/void`, {
+    reason: 'Customer requested bill refund and reissue',
+  });
+  assert(voidRes.status === 201, 'Void invoice returns 201 Created');
+  assert(voidRes.data?.credit_note?.credit_note_number?.startsWith('CN/'), 'Credit note starts with CN/');
+  assert(voidRes.data?.credit_note?.amount_paise === 47300, 'Credit note amount is ₹473.00');
+
+  // Verify status is now CREDIT_NOTE_ISSUED
+  const checkVoided = await request(baseUrl, 'GET', `/api/cfr/invoices/${issuedInvId}`);
+  assert(checkVoided.data?.invoice?.status === 'CREDIT_NOTE_ISSUED', 'Invoice status transitioned to CREDIT_NOTE_ISSUED');
+
   // 4. Cleanup
   console.log('\n[4/4] Shutting down test server and closing database...');
   await new Promise<void>((resolve) => server.close(() => resolve()));

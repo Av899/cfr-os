@@ -38,5 +38,8 @@ jobs:
       - name: Run CFR Dietary Invariants & Database Test
         run: npx ts-node --transpile-only -P tests/tsconfig.json tests/cfr-dietary.test.ts
 
+      - name: Run CFR GST Engine & FY Invoicing Test
+        run: npx ts-node --transpile-only -P tests/tsconfig.json tests/cfr-gst-invoicing.test.ts
+
       - name: Run CFR HTTP API Endpoints Test
         run: npx ts-node --transpile-only -P tests/tsconfig.json tests/cfr-api.test.ts

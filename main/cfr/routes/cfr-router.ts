@@ -7,6 +7,9 @@ import { Router, Request, Response } from 'express';
 import { getDatabase } from '../../db';
 import { validateIngredient, isDietarySafe, DietaryViolationError, parseDietaryFlags } from '../dietary/guard';
 import { CfrIngredient } from '../types/dietary';
+import { calculateHaryanaGst, validatePriceIncrement, InvalidPriceIncrementError } from '../money/gst-engine';
+import { issueCfrInvoice, issueCfrCreditNote, CfrInvoiceRecord } from '../invoicing/sequence';
+import { generateThermalReceiptText, ReceiptItem } from '../templates/thermal-receipt';
 
 export const cfrRouter = Router();
 
@@ -20,16 +23,20 @@ cfrRouter.get('/health', (req: Request, res: Response) => {
     const versionRow = db.prepare("SELECT value FROM cfr_meta WHERE key = 'schema_version'").get() as { value: string } | undefined;
     const ingredientCount = (db.prepare('SELECT COUNT(*) as count FROM cfr_ingredients').get() as { count: number }).count;
     const recipeCount = (db.prepare('SELECT COUNT(*) as count FROM cfr_recipes').get() as { count: number }).count;
+    const invoiceCount = (db.prepare('SELECT COUNT(*) as count FROM cfr_invoices').get() as { count: number }).count;
 
     res.json({
       status: 'ok',
       brand: 'Coffee First Ritual (CFR)',
       location: 'Sector 12, Karnal, Haryana',
       dietary_policy: '100% Vegetarian & Artisanal Eggless (Zero Tolerance)',
+      gst_policy: 'Haryana 5% GST (2.5% CGST + 2.5% SGST) + Roundoff',
+      price_guard: 'Strict ₹10 Price Increments',
       schema_version: Number(versionRow?.value || 1),
       counts: {
         ingredients: ingredientCount,
         recipes: recipeCount,
+        invoices: invoiceCount,
       },
       timestamp: new Date().toISOString(),
     });
@@ -80,10 +87,8 @@ cfrRouter.post('/ingredients', (req: Request, res: Response) => {
       dietary_flags: String(dietary_flags).trim(),
     };
 
-    // 1. Guard check: Throws 422 if egg/gelatin/animal derivative
     validateIngredient(candidate);
 
-    // 2. Insert into SQLite (protected by DB-level CHECK constraint as second barrier)
     const db = getDatabase();
     db.prepare(`
       INSERT INTO cfr_ingredients (
@@ -169,5 +174,199 @@ cfrRouter.post('/dietary/validate', (req: Request, res: Response) => {
     res.status(400).json({ error: 'Provide either "flags" string or "items" array' });
   } catch (error: any) {
     res.status(500).json({ error: error?.message || 'Failed to validate dietary safety' });
+  }
+});
+
+/**
+ * POST /api/cfr/invoices/preview
+ * Calculates Haryana 5% GST and validates ₹10 price increments for an order before settlement.
+ */
+cfrRouter.post('/invoices/preview', (req: Request, res: Response) => {
+  try {
+    const { taxable_paise, items } = req.body;
+
+    let subtotalPaise = 0;
+
+    if (Array.isArray(items)) {
+      for (const item of items) {
+        const rate = item.rate_paise || item.price_paise || 0;
+        const qty = item.quantity || 1;
+        // Validate ₹10 price increment
+        validatePriceIncrement(rate, item.name);
+        subtotalPaise += rate * qty;
+      }
+    } else if (typeof taxable_paise === 'number') {
+      subtotalPaise = taxable_paise;
+    } else {
+      return res.status(400).json({ error: 'Provide either "items" array or "taxable_paise" integer' });
+    }
+
+    const gst = calculateHaryanaGst(subtotalPaise);
+    res.json({
+      taxable_subtotal: gst.taxable_paise,
+      gst_breakdown: gst,
+    });
+  } catch (error: any) {
+    if (error instanceof InvalidPriceIncrementError || error.name === 'InvalidPriceIncrementError') {
+      return res.status(400).json({ error: error.message, code: error.code });
+    }
+    res.status(500).json({ error: error?.message || 'Failed to compute GST preview' });
+  }
+});
+
+/**
+ * POST /api/cfr/invoices/issue
+ * Issues an official gap-free FY GST invoice on payment completion.
+ */
+cfrRouter.post('/invoices/issue', (req: Request, res: Response) => {
+  try {
+    const { order_id, taxable_paise, payment_method, payment_ref, items } = req.body;
+
+    if (!order_id || typeof taxable_paise !== 'number' || !payment_method) {
+      return res.status(400).json({ error: 'Missing required fields: order_id, taxable_paise, payment_method' });
+    }
+
+    // Validate ₹10 increments on items if passed
+    if (Array.isArray(items)) {
+      for (const item of items) {
+        if (item.rate_paise) {
+          validatePriceIncrement(item.rate_paise, item.name);
+        }
+      }
+    }
+
+    const db = getDatabase();
+    const result = issueCfrInvoice(db, {
+      order_id,
+      taxable_paise,
+      payment_method,
+      payment_ref,
+    });
+
+    res.status(201).json({
+      message: 'Invoice issued successfully',
+      invoice: result.invoice,
+      gst: result.gst,
+    });
+  } catch (error: any) {
+    if (error instanceof InvalidPriceIncrementError) {
+      return res.status(400).json({ error: error.message, code: error.code });
+    }
+    res.status(500).json({ error: error?.message || 'Failed to issue CFR invoice' });
+  }
+});
+
+/**
+ * GET /api/cfr/invoices
+ * Lists issued invoices.
+ */
+cfrRouter.get('/invoices', (req: Request, res: Response) => {
+  try {
+    const db = getDatabase();
+    const { fy, limit = 50 } = req.query;
+
+    let query = 'SELECT * FROM cfr_invoices';
+    const params: any[] = [];
+
+    if (fy) {
+      query += ' WHERE fy = ?';
+      params.push(String(fy));
+    }
+    query += ' ORDER BY created_at DESC LIMIT ?';
+    params.push(Number(limit));
+
+    const invoices = db.prepare(query).all(...params) as CfrInvoiceRecord[];
+    res.json({
+      total: invoices.length,
+      invoices,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to fetch invoices' });
+  }
+});
+
+/**
+ * GET /api/cfr/invoices/:id
+ * Fetches a single invoice with full GST breakdown.
+ */
+cfrRouter.get('/invoices/:id', (req: Request, res: Response) => {
+  try {
+    const db = getDatabase();
+    const invoiceId = String(req.params.id);
+    const inv = db
+      .prepare('SELECT * FROM cfr_invoices WHERE id = ? OR invoice_number = ?')
+      .get(invoiceId, invoiceId) as CfrInvoiceRecord | undefined;
+
+    if (!inv) {
+      return res.status(404).json({ error: `Invoice "${invoiceId}" not found` });
+    }
+
+    const gst = calculateHaryanaGst(inv.taxable_paise);
+    res.json({
+      invoice: inv,
+      gst,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to fetch invoice' });
+  }
+});
+
+/**
+ * POST /api/cfr/invoices/:id/void
+ * Voids an invoice by issuing an official sequential Credit Note.
+ */
+cfrRouter.post('/invoices/:id/void', (req: Request, res: Response) => {
+  try {
+    const { reason = 'Order cancelled by customer' } = req.body;
+    const db = getDatabase();
+    const invoiceId = String(req.params.id);
+
+    const creditNote = issueCfrCreditNote(db, {
+      invoice_id: invoiceId,
+      reason: String(reason),
+    });
+
+    res.status(201).json({
+      message: 'Invoice voided and credit note issued successfully',
+      credit_note: creditNote,
+    });
+  } catch (error: any) {
+    res.status(400).json({ error: error?.message || 'Failed to void invoice' });
+  }
+});
+
+/**
+ * GET /api/cfr/invoices/:id/receipt-text
+ * Generates formatted 80mm thermal receipt text for the invoice.
+ */
+cfrRouter.get('/invoices/:id/receipt-text', (req: Request, res: Response) => {
+  try {
+    const db = getDatabase();
+    const invoiceId = String(req.params.id);
+    const inv = db
+      .prepare('SELECT * FROM cfr_invoices WHERE id = ? OR invoice_number = ?')
+      .get(invoiceId, invoiceId) as CfrInvoiceRecord | undefined;
+
+    if (!inv) {
+      return res.status(404).json({ error: `Invoice "${invoiceId}" not found` });
+    }
+
+    const gst = calculateHaryanaGst(inv.taxable_paise);
+
+    // Mock/sample items if line items aren't stored separately yet
+    const items: ReceiptItem[] = [
+      {
+        name: 'Specialty Beverage & Bakery Items',
+        quantity: 1,
+        rate_paise: inv.taxable_paise,
+        amount_paise: inv.taxable_paise,
+      },
+    ];
+
+    const receiptText = generateThermalReceiptText(inv, gst, items);
+
+    res.type('text/plain').send(receiptText);
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to generate receipt text' });
   }
 });

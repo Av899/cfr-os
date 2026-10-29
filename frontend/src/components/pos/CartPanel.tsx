@@ -38,6 +38,7 @@ import { calculateAppliedCharges } from '@/lib/charges';
 import { chargesForOrderType, useChargesStore } from '@/store/charges';
 import { getCurrencyFractionDigits } from '@countries';
 import { isTerminalItemStatus } from '../../../../shared/order-item-status';
+import { gst } from '@/lib/money';
 
 interface Props {
   tables: Table[];
@@ -619,6 +620,35 @@ export default function CartPanel({
           <span className="font-semibold text-foreground">{t('subtotal')}</span>
           <span className="font-bold text-foreground tabular-nums">{fmt(cart.subtotal())}</span>
         </div>
+        {/* CFR Haryana 5% GST Breakdown Preview */}
+        {cart.items.length > 0 && (() => {
+          const subtotalPaise = Math.round(cart.subtotal() * 100);
+          const gstPreview = gst(subtotalPaise);
+          return (
+            <div className="mb-4 p-3 rounded-xl bg-card border border-border/80 shadow-xs text-xs space-y-1.5 font-sans">
+              <div className="flex justify-between text-muted-foreground">
+                <span>CGST (2.5%)</span>
+                <span className="tabular-nums font-mono">₹{(gstPreview.cgst / 100).toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-muted-foreground">
+                <span>SGST (2.5%)</span>
+                <span className="tabular-nums font-mono">₹{(gstPreview.sgst / 100).toFixed(2)}</span>
+              </div>
+              {gstPreview.roundOff !== 0 && (
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Round-off</span>
+                  <span className="tabular-nums font-mono">
+                    {gstPreview.roundOff > 0 ? '+' : ''}₹{(gstPreview.roundOff / 100).toFixed(2)}
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between pt-1.5 border-t border-border/60 font-semibold text-foreground text-sm">
+                <span>Estimated Total (5% GST)</span>
+                <span className="tabular-nums font-mono text-primary font-bold">₹{(gstPreview.payable / 100).toFixed(2)}</span>
+              </div>
+            </div>
+          );
+        })()}
         {(appliedCharges.length > 0 || addableCharges.length > 0) && (
           <div className="mb-4 space-y-1" data-testid="cart-charges">
             {appliedCharges.map((charge) => {

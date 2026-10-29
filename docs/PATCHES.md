@@ -74,3 +74,25 @@ Each patch must be minimal (under 10 lines) and immediately delegate to modules 
 - **Upstream Risk**: Zero. Upstream release workflows remain fully intact and can be manually triggered at any time.
 
 ---
+
+---
+
+## Seam 005: Money Engine Roundoff Calculation
+
+- **Target File**: `frontend/src/lib/money.ts`
+- **Location**: `gst()` helper function (~line 50)
+- **Date**: 2026-10-29
+- **Purpose**: Computes 2.5% CGST + 2.5% SGST and invoice-level round-off to the nearest whole rupee, aligning frontend and backend money calculations with Indian GST statutory requirements.
+- **Upstream Risk**: Zero. FloCafe's `displayAmountToCents` and `allocateEqualShares` are unchanged.
+
+---
+
+## Seam 006: CartPanel POS GST Breakdown Preview
+
+- **Target File**: `frontend/src/components/pos/CartPanel.tsx`
+- **Location**: Cart Footer Subtotal section (~line 622)
+- **Date**: 2026-10-29
+- **Purpose**: Renders the live Haryana 5% GST breakdown preview (CGST 2.5%, SGST 2.5%, Round-off, and Net Estimated Total) in the POS cart footer.
+- **Upstream Risk**: Minimal visual extension. Does not alter cart item state or FloCafe's order dispatch.
+
+---

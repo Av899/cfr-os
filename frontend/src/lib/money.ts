@@ -45,9 +45,21 @@ export const rupees = (paise: number, digits = 0) =>
   }).format(paise / 100);
 
 /**
- * CFR OS: Calculates 5% GST (2.5% CGST + 2.5% SGST) from integer paise subtotal.
+ * CFR OS: Calculates 5% Haryana GST (2.5% CGST + 2.5% SGST) + Roundoff to nearest whole rupee.
+ * Matches backend gst-engine.ts exactly.
  */
 export function gst(subtotalPaise: number) {
   const cgst = Math.round((subtotalPaise * 25) / 1000); // 2.5%
-  return { cgst, sgst: cgst, total: subtotalPaise + cgst * 2 };
+  const sgst = cgst;
+  const rawTotal = subtotalPaise + cgst + sgst;
+  const payable = Math.round(rawTotal / 100) * 100;
+  const roundOff = payable - rawTotal;
+  return {
+    cgst,
+    sgst,
+    totalTax: cgst + sgst,
+    rawTotal,
+    roundOff,
+    payable,
+  };
 }
