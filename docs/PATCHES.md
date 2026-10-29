@@ -62,3 +62,15 @@ Each patch must be minimal (under 10 lines) and immediately delegate to modules 
   ```
 
 ---
+
+---
+
+## Seam 004: CFR CI Workflow & Action Optimization
+
+- **Target Files**: `.github/workflows/ci.yml`, `.github/workflows/full-cross-platform-matrix.yml`, `.github/workflows/cfr-ci.yml`
+- **Location**: Workflow triggers
+- **Date**: 2026-10-29
+- **Purpose**: Switches heavy upstream 4-OS release matrix to manual trigger (`workflow_dispatch`) and adds fast, focused `CFR OS CI` workflow validating build, dietary invariants, and CFR API endpoints.
+- **Upstream Risk**: Zero. Upstream release workflows remain fully intact and can be manually triggered at any time.
+
+---

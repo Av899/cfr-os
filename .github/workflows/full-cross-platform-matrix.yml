@@ -3,10 +3,6 @@ name: Full Cross-Platform Matrix
 # Runs on merges/pushes to main, nightly schedule, and manual workflow_dispatch.
 # Does NOT run on pull requests (PRs are validated with fast, focused CI in ci.yml).
 on:
-  push:
-    branches: [main]
-  schedule:
-    - cron: '0 0 * * *' # Nightly
   workflow_dispatch:
 
 concurrency:

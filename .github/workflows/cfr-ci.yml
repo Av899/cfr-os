@@ -1,0 +1,42 @@
+name: CFR OS CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: cfr-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: CFR OS Validation (Build & Dietary Tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+
+      - name: Install Root Dependencies
+        run: npm install --ignore-scripts
+
+      - name: Install Frontend Dependencies
+        run: npm --prefix frontend install --ignore-scripts
+
+      - name: Compile Backend TypeScript
+        run: npm run build
+
+      - name: Run CFR Dietary Invariants & Database Test
+        run: npx ts-node --transpile-only -P tests/tsconfig.json tests/cfr-dietary.test.ts
+
+      - name: Run CFR HTTP API Endpoints Test
+        run: npx ts-node --transpile-only -P tests/tsconfig.json tests/cfr-api.test.ts
