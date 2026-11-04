@@ -23,3 +23,4 @@ if (iconMatch) {
 } else {
   console.log('iconMatch not found');
 }
+

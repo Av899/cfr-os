@@ -164,6 +164,24 @@ CREATE TABLE IF NOT EXISTS cfr_dial_in_logs (
   barista_name TEXT,
   created_at TEXT NOT NULL
 );
+
+-- UPI and Dual-Track Payment Reconciliations
+CREATE TABLE IF NOT EXISTS cfr_payments (
+  id TEXT PRIMARY KEY,
+  order_id TEXT NOT NULL,
+  invoice_id TEXT,
+  method TEXT NOT NULL CHECK (method IN ('UPI_DYNAMIC', 'UPI_MANUAL', 'CASH', 'CARD')),
+  amount_paise INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'PENDING_RECONCILIATION' CHECK (status IN ('PENDING_RECONCILIATION', 'CONFIRMED', 'FAILED')),
+  upi_uri TEXT,
+  utr_ref TEXT,
+  gateway_payment_id TEXT,
+  reconciled_at TEXT,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_cfr_payments_order ON cfr_payments(order_id);
+CREATE INDEX IF NOT EXISTS idx_cfr_payments_status ON cfr_payments(status);
 `;
 
 /**

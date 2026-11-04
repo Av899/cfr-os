@@ -96,3 +96,14 @@ Each patch must be minimal (under 10 lines) and immediately delegate to modules 
 - **Upstream Risk**: Minimal visual extension. Does not alter cart item state or FloCafe's order dispatch.
 
 ---
+
+## Seam 007: POS PaymentModal Dynamic UPI QR & Dual-Track Payments
+
+- **Target File**: `frontend/src/components/pos/PaymentModal.tsx`
+- **Location**: Imports, Amount Card header (~line 1615), Tender row `onClick` (~line 2085), and Modal root (~line 2410)
+- **Date**: 2026-11-04
+- **Purpose**: Hooks CFR OS Dynamic UPI QR modal (`frontend/src/cfr/components/UpiPaymentModal.tsx`) into POS payment checkout. Cashiers can launch instant dynamic UPI QR codes and accept offline 12-digit UTR references without stalling service.
+- **Upstream Risk**: Zero. FloCafe's core payment submission and idempotency flow remain 100% intact; upon UTR or webhook confirmation, the tender amount and transaction reference are set into FloCafe's standard payment payload.
+
+---
+

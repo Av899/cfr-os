@@ -61,5 +61,6 @@ export function gst(subtotalPaise: number) {
     rawTotal,
     roundOff,
     payable,
+    total: payable,
   };
 }

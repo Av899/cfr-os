@@ -10,6 +10,15 @@ import { CfrIngredient } from '../types/dietary';
 import { calculateHaryanaGst, validatePriceIncrement, InvalidPriceIncrementError } from '../money/gst-engine';
 import { issueCfrInvoice, issueCfrCreditNote, CfrInvoiceRecord } from '../invoicing/sequence';
 import { generateThermalReceiptText, ReceiptItem } from '../templates/thermal-receipt';
+import { generateUpiQr, isValidUtr } from '../payments/upi-qr';
+import {
+  createPaymentRecord,
+  reconcileManualUtr,
+  reconcileGatewayPayment,
+  getPendingReconciliations,
+  getPaymentRecord,
+  InvalidUtrError,
+} from '../payments/reconciler';
 
 export const cfrRouter = Router();
 
@@ -24,6 +33,11 @@ cfrRouter.get('/health', (req: Request, res: Response) => {
     const ingredientCount = (db.prepare('SELECT COUNT(*) as count FROM cfr_ingredients').get() as { count: number }).count;
     const recipeCount = (db.prepare('SELECT COUNT(*) as count FROM cfr_recipes').get() as { count: number }).count;
     const invoiceCount = (db.prepare('SELECT COUNT(*) as count FROM cfr_invoices').get() as { count: number }).count;
+    const pendingPaymentCount = (
+      db.prepare("SELECT COUNT(*) as count FROM cfr_payments WHERE status = 'PENDING_RECONCILIATION'").get() as {
+        count: number;
+      }
+    ).count;
 
     res.json({
       status: 'ok',
@@ -32,11 +46,13 @@ cfrRouter.get('/health', (req: Request, res: Response) => {
       dietary_policy: '100% Vegetarian & Artisanal Eggless (Zero Tolerance)',
       gst_policy: 'Haryana 5% GST (2.5% CGST + 2.5% SGST) + Roundoff',
       price_guard: 'Strict ₹10 Price Increments',
+      payments_policy: 'Dynamic UPI QR + Dual-Track WAN Offline Resilience',
       schema_version: Number(versionRow?.value || 1),
       counts: {
         ingredients: ingredientCount,
         recipes: recipeCount,
         invoices: invoiceCount,
+        pending_reconciliations: pendingPaymentCount,
       },
       timestamp: new Date().toISOString(),
     });
@@ -370,3 +386,142 @@ cfrRouter.get('/invoices/:id/receipt-text', (req: Request, res: Response) => {
     res.status(500).json({ error: error?.message || 'Failed to generate receipt text' });
   }
 });
+
+/**
+ * POST /api/cfr/payments/upi-qr
+ * Generates dynamic NPCI UPI Payment QR code for an order.
+ */
+cfrRouter.post('/payments/upi-qr', async (req: Request, res: Response) => {
+  try {
+    const { order_id, amount_paise, invoice_number, note } = req.body;
+
+    if (!order_id || typeof amount_paise !== 'number' || amount_paise <= 0) {
+      return res.status(400).json({ error: 'Missing required parameters: order_id, amount_paise (> 0)' });
+    }
+
+    const qrResult = await generateUpiQr({
+      amountPaise: amount_paise,
+      orderId: String(order_id),
+      invoiceNumber: invoice_number ? String(invoice_number) : undefined,
+      note: note ? String(note) : undefined,
+    });
+
+    const db = getDatabase();
+    const payment = createPaymentRecord(db, {
+      order_id: String(order_id),
+      method: 'UPI_DYNAMIC',
+      amount_paise,
+      upi_uri: qrResult.uri,
+    });
+
+    res.status(201).json({
+      payment_id: payment.id,
+      uri: qrResult.uri,
+      qr_data_url: qrResult.qrDataUrl,
+      amount_paise: qrResult.amountPaise,
+      amount_rupees: qrResult.amountRupees,
+      payee_vpa: qrResult.payeeVpa,
+      payee_name: qrResult.payeeName,
+      expires_at: qrResult.expiresAt,
+      txn_ref: qrResult.txnRef,
+      status: payment.status,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to generate dynamic UPI QR' });
+  }
+});
+
+/**
+ * POST /api/cfr/payments/reconcile-manual
+ * Reconciles payment manually using 12-digit Indian Bank UTR when offline or un-webhooked.
+ */
+cfrRouter.post('/payments/reconcile-manual', (req: Request, res: Response) => {
+  try {
+    const { payment_id, order_id, utr, invoice_id } = req.body;
+
+    if (!utr) {
+      return res.status(400).json({ error: 'Missing required parameter: utr' });
+    }
+
+    const db = getDatabase();
+    const updatedPayment = reconcileManualUtr(db, {
+      payment_id: payment_id ? String(payment_id) : undefined,
+      order_id: order_id ? String(order_id) : undefined,
+      utr: String(utr),
+      invoice_id: invoice_id ? String(invoice_id) : undefined,
+    });
+
+    res.json({
+      message: 'Payment reconciled via manual UPI UTR',
+      payment: updatedPayment,
+    });
+  } catch (error: any) {
+    if (error instanceof InvalidUtrError || error.name === 'InvalidUtrError' || error.code === 'ERR_CFR_INVALID_UTR') {
+      return res.status(400).json({ error: error.message, code: error.code });
+    }
+    res.status(500).json({ error: error?.message || 'Failed to reconcile payment' });
+  }
+});
+
+/**
+ * POST /api/cfr/payments/webhook
+ * Handles simulated or live gateway webhook confirmation (Razorpay POS / Smart QR).
+ */
+cfrRouter.post('/payments/webhook', (req: Request, res: Response) => {
+  try {
+    const { payment_id, gateway_payment_id, status = 'CONFIRMED' } = req.body;
+
+    if (!payment_id || !gateway_payment_id) {
+      return res.status(400).json({ error: 'Missing required parameters: payment_id, gateway_payment_id' });
+    }
+
+    const db = getDatabase();
+    const updated = reconcileGatewayPayment(db, {
+      payment_id: String(payment_id),
+      gateway_payment_id: String(gateway_payment_id),
+      status: status === 'FAILED' ? 'FAILED' : 'CONFIRMED',
+    });
+
+    res.json({
+      message: 'Payment updated from gateway webhook',
+      payment: updated,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to process payment webhook' });
+  }
+});
+
+/**
+ * GET /api/cfr/payments/pending
+ * Lists all pending reconciliation records.
+ */
+cfrRouter.get('/payments/pending', (req: Request, res: Response) => {
+  try {
+    const db = getDatabase();
+    const pending = getPendingReconciliations(db);
+    res.json({
+      total: pending.length,
+      pending,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to fetch pending reconciliations' });
+  }
+});
+
+/**
+ * GET /api/cfr/payments/:id
+ * Fetches the status of a specific payment by ID.
+ */
+cfrRouter.get('/payments/:id', (req: Request, res: Response) => {
+  try {
+    const db = getDatabase();
+    const payment = getPaymentRecord(db, String(req.params.id));
+    if (!payment) {
+      return res.status(404).json({ error: `Payment "${req.params.id}" not found` });
+    }
+    res.json({ payment });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to fetch payment' });
+  }
+});
+

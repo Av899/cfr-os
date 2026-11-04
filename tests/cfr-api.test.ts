@@ -224,6 +224,59 @@ async function run() {
   const checkVoided = await request(baseUrl, 'GET', `/api/cfr/invoices/${issuedInvId}`);
   assert(checkVoided.data?.invoice?.status === 'CREDIT_NOTE_ISSUED', 'Invoice status transitioned to CREDIT_NOTE_ISSUED');
 
+  console.log('\n--- Testing POST /api/cfr/payments/upi-qr ---');
+  const upiQrRes = await request(baseUrl, 'POST', '/api/cfr/payments/upi-qr', {
+    order_id: 'ord_api_test_01',
+    amount_paise: 47300,
+    invoice_number: 'CFR/26-27/000001',
+    note: 'Melbourne Magic + Croissant',
+  });
+  assert(upiQrRes.status === 201, 'Dynamic UPI QR endpoint returns 201 Created');
+  assert(upiQrRes.data?.uri?.startsWith('upi://pay?'), 'Returned URI starts with upi://pay?');
+  assert(upiQrRes.data?.qr_data_url?.startsWith('data:image/png;base64,'), 'Returned qr_data_url is valid base64 PNG');
+  assert(upiQrRes.data?.amount_rupees === '473.00', 'Amount string is ₹473.00');
+  assert(upiQrRes.data?.status === 'PENDING_RECONCILIATION', 'Initial status is PENDING_RECONCILIATION');
+  const paymentId = upiQrRes.data?.payment_id;
+
+  console.log('\n--- Testing GET /api/cfr/payments/pending ---');
+  const pendingRes = await request(baseUrl, 'GET', '/api/cfr/payments/pending');
+  assert(pendingRes.status === 200, 'Pending payments endpoint returns 200');
+  assert(pendingRes.data?.total >= 1, 'Pending reconciliations list count >= 1');
+  assert(pendingRes.data?.pending?.some((p: any) => p.id === paymentId), 'New payment is present in pending list');
+
+  console.log('\n--- Testing POST /api/cfr/payments/reconcile-manual (Invalid UTR) ---');
+  const invalidUtrRes = await request(baseUrl, 'POST', '/api/cfr/payments/reconcile-manual', {
+    payment_id: paymentId,
+    utr: 'bad',
+  });
+  assert(invalidUtrRes.status === 400, 'Invalid UTR returns 400 Bad Request');
+  assert(invalidUtrRes.data?.code === 'ERR_CFR_INVALID_UTR', 'Error code is ERR_CFR_INVALID_UTR');
+
+  console.log('\n--- Testing POST /api/cfr/payments/reconcile-manual (Valid 12-digit UTR) ---');
+  const validUtrRes = await request(baseUrl, 'POST', '/api/cfr/payments/reconcile-manual', {
+    payment_id: paymentId,
+    utr: '430489123456',
+  });
+  assert(validUtrRes.status === 200, 'Valid UTR returns 200 OK');
+  assert(validUtrRes.data?.payment?.status === 'CONFIRMED', 'Payment status is now CONFIRMED');
+  assert(validUtrRes.data?.payment?.utr_ref === '430489123456', 'UTR ref is saved');
+
+  console.log('\n--- Testing POST /api/cfr/payments/webhook ---');
+  const newUpiForWebhook = await request(baseUrl, 'POST', '/api/cfr/payments/upi-qr', {
+    order_id: 'ord_api_test_02',
+    amount_paise: 23000,
+  });
+  const webhookPayId = newUpiForWebhook.data?.payment_id;
+
+  const webhookRes = await request(baseUrl, 'POST', '/api/cfr/payments/webhook', {
+    payment_id: webhookPayId,
+    gateway_payment_id: 'pay_rzp_live_test_9988',
+    status: 'CONFIRMED',
+  });
+  assert(webhookRes.status === 200, 'Webhook returns 200 OK');
+  assert(webhookRes.data?.payment?.status === 'CONFIRMED', 'Webhook confirms payment');
+  assert(webhookRes.data?.payment?.gateway_payment_id === 'pay_rzp_live_test_9988', 'Gateway payment ID stored');
+
   // 4. Cleanup
   console.log('\n[4/4] Shutting down test server and closing database...');
   await new Promise<void>((resolve) => server.close(() => resolve()));

@@ -54,3 +54,4 @@ export function CfrLogo({ variant = 'full', className = '', color }: CfrLogoProp
     />
   );
 }
+

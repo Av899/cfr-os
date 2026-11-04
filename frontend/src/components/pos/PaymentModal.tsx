@@ -12,7 +12,9 @@ import {
   Send,
   ChevronDown,
   Users,
+  QrCode,
 } from 'lucide-react';
+import { UpiPaymentModal, type UpiPaymentResult } from '@/cfr/components/UpiPaymentModal';
 import { Button } from '@/components/ui/button';
 import api, {
   captureClientOperationFailure,
@@ -756,6 +758,19 @@ export default function PaymentModal({
         index === idx ? { ...payment, amount: dueDisplay > 0 ? String(dueDisplay) : '' } : payment,
       ),
     );
+  };
+
+  // CFR SEAM: Dynamic UPI QR modal state & payment confirmation handler
+  const [cfrUpiOpen, setCfrUpiOpen] = useState(false);
+  const handleCfrUpiConfirmed = (res: UpiPaymentResult) => {
+    const upiIdx = payments.findIndex(
+      (p) => tenderLabel(p).toLowerCase() === 'upi' || p.method.toLowerCase() === 'upi',
+    );
+    if (upiIdx !== -1) {
+      updatePaymentAmount(upiIdx, formatInput(toDisplayUnit(res.amount)));
+      updatePaymentTransactionId(upiIdx, res.transaction_id);
+    }
+    setCfrUpiOpen(false);
   };
 
   const activeAmountValue =
@@ -1597,16 +1612,26 @@ export default function PaymentModal({
                   </p>
                   <p className="text-4xl font-bold mt-1 tracking-tight">{currencyFmt(remaining)}</p>
                 </div>
-                {cartCustomer && (
-                  <div className="text-end ms-4 shrink-0">
-                    <div className="w-8 h-8 rounded-full bg-card/10 flex items-center justify-center mb-1 ms-auto">
-                      <User size={16} className="text-white/70" />
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCfrUpiOpen(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#8B5E3C] hover:bg-[#6F4A2F] text-white text-xs font-semibold shadow-sm transition-colors"
+                  >
+                    <QrCode size={14} />
+                    <span>Dynamic UPI</span>
+                  </button>
+                  {cartCustomer && (
+                    <div className="text-end ms-2 shrink-0">
+                      <div className="w-8 h-8 rounded-full bg-card/10 flex items-center justify-center mb-1 ms-auto">
+                        <User size={16} className="text-white/70" />
+                      </div>
+                      <p className="text-sm font-semibold text-white leading-tight">
+                        {cartCustomer.name}
+                      </p>
                     </div>
-                    <p className="text-sm font-semibold text-white leading-tight">
-                      {cartCustomer.name}
-                    </p>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
 
               <div className="border-t border-white/10 pt-3 space-y-1.5 text-xs">
@@ -2058,6 +2083,7 @@ export default function PaymentModal({
                           if (attemptLocked) return;
                           setAmountTarget({ kind: 'payment', index: idx });
                           allocateRemainingTo(idx);
+                          if (label.toLowerCase() === 'upi') setCfrUpiOpen(true);
                         }}
                         className={`touch-target w-36 shrink-0 justify-start rounded-s-xl border px-3 gap-2 text-sm font-semibold transition-colors ${active ? 'bg-brand text-white border-brand' : 'bg-muted text-foreground border-border hover:border-brand hover:text-brand'}`}
                       >
@@ -2381,6 +2407,17 @@ export default function PaymentModal({
         />
       )}
       {ConfirmDialog}
+      {cfrUpiOpen && (
+        <UpiPaymentModal
+          isOpen={cfrUpiOpen}
+          onClose={() => setCfrUpiOpen(false)}
+          orderId={bill.order_id}
+          billId={bill.id}
+          billNumber={bill.bill_number}
+          amountPaise={Math.round(remaining * 100)}
+          onPaymentConfirmed={handleCfrUpiConfirmed}
+        />
+      )}
     </div>
   );
 }

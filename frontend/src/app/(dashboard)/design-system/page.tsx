@@ -349,14 +349,20 @@ export default function DesignSystemPage() {
                 <span>SGST (2.5%)</span>
                 <span className="tabular-nums font-mono">{rupees(tax.sgst, 2)}</span>
               </div>
+              {tax.roundOff !== 0 && (
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Round-off</span>
+                  <span className="tabular-nums font-mono">{tax.roundOff > 0 ? `+${rupees(tax.roundOff, 2)}` : rupees(tax.roundOff, 2)}</span>
+                </div>
+              )}
               <div className="flex justify-between items-baseline pt-3 border-t border-border text-lg font-bold text-foreground">
                 <span>Total</span>
-                <span className="text-2xl font-bold tabular-nums font-mono">{rupees(tax.total, 2)}</span>
+                <span className="text-2xl font-bold tabular-nums font-mono">{rupees(tax.payable, 2)}</span>
               </div>
             </div>
 
             <Button size="pos" className="w-full mt-4">
-              Charge {rupees(tax.total, 2)}
+              Charge {rupees(tax.payable, 2)}
             </Button>
           </Card>
 
