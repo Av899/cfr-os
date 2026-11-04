@@ -24,7 +24,7 @@ function resolveLanguage(): Language {
 function getTranslator(lang: Language): (key: string, values?: Record<string, unknown>) => string {
   const locale = LANGUAGES[lang]?.locale ?? 'en';
   const messages = getCachedMessages(lang) ?? getCachedMessages('en') ?? {};
-  return createTranslator({ locale, messages }) as unknown as
+  return createTranslator({ locale, messages, onError: () => {} }) as unknown as
     (key: string, values?: Record<string, unknown>) => string;
 }
 

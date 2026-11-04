@@ -93,7 +93,9 @@ function translatorFor(language: Language | string): ((key: string) => string) |
   if (!messages) return null;
   // `createTranslator` resolves dotted keys against the whole message tree;
   // the cached messages are untyped, so the translator accepts any key here.
-  return createTranslator({ locale, messages }) as unknown as (key: string) => string;
+  return createTranslator({ locale, messages, onError: () => {} }) as unknown as (
+    key: string,
+  ) => string;
 }
 
 /** Pure label-catalog lookup for PrintContext backed by shared messages. */

@@ -34,7 +34,9 @@ export interface DeliverySlipWebPrintOptions {
 function translatorFor(lang: Language): (key: string) => string {
   const locale = LANGUAGES[lang]?.locale ?? 'en';
   const messages = getCachedMessages(lang) ?? getCachedMessages('en') ?? {};
-  return createTranslator({ locale, messages }) as unknown as (key: string) => string;
+  return createTranslator({ locale, messages, onError: () => {} }) as unknown as (
+    key: string,
+  ) => string;
 }
 
 function slipNoteHtml(
