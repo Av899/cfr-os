@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
+import { CfrLogo } from '@/components/ui/CfrLogo';
 import {
   ArrowLeft,
   ArrowRight,
@@ -326,9 +327,9 @@ export default function SetupPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted px-4 py-12">
       <div className="w-full max-w-2xl">
         <div className="text-center mb-8">
-          <img src="/logo.svg" alt="Flo" width={72} height={72} className="mx-auto mb-4" />
-          <h1 className="text-3xl font-bold">{t('welcome')}</h1>
-          <p className="text-muted-foreground mt-2">{t('tagline')}</p>
+          <CfrLogo variant="mark" className="w-16 h-16 mx-auto mb-4 text-[#1E1B16] dark:text-[#F6F4ED]" />
+          <h1 className="text-3xl font-light tracking-tight">{t('welcome')}</h1>
+          <p className="text-xs uppercase tracking-widest text-muted-foreground mt-1">Good Coffee. Better Days.</p>
         </div>
 
         <div className="flex justify-center gap-2 mb-8">

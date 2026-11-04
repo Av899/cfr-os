@@ -261,7 +261,7 @@ export function UpiPaymentModal({
         {/* Header Bar */}
         <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-[#E9E7E0] dark:border-[#2E2822]">
           <div className="flex items-center gap-3">
-            <CfrLogo variant="mark" className="w-7 h-7" color="#8B5E3C" />
+            <CfrLogo variant="mark" className="w-7 h-7 text-[#1E1B16] dark:text-[#F6F4ED]" />
             <div>
               <p className="text-[10px] tracking-widest uppercase font-semibold text-[#8B5E3C] dark:text-[#C9A782]">
                 COFFEE FIRST RITUAL • SECTOR 12

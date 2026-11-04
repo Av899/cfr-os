@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
+import { CfrLogo } from '@/components/ui/CfrLogo';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   DropdownMenu,
@@ -259,8 +260,8 @@ function LoginContent() {
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <img src="/logo.svg" alt="Flo" width={96} height={96} className="mx-auto mb-3" />
-          <p className="text-muted-foreground mt-2">{t('signInTitle')}</p>
+          <CfrLogo variant="full" className="mx-auto mb-2 text-[#1E1B16] dark:text-[#F6F4ED]" />
+          <p className="text-xs text-muted-foreground mt-2">{t('signInTitle')}</p>
         </div>
         {dbError && (
           <div className="mb-4 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">

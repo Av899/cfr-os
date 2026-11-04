@@ -1,11 +1,11 @@
 {
-  "name": "Flo",
-  "short_name": "Flo",
-  "description": "Smart Point of Sale for restaurants, salons, and retail",
+  "name": "Coffee First Ritual",
+  "short_name": "CFR OS",
+  "description": "Good Coffee. Better Days. • Specialty Coffee & Artisanal Eggless Bakery Operating System",
   "start_url": "/dashboard",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#3248FF",
+  "background_color": "#F6F4ED",
+  "theme_color": "#1E1B16",
   "orientation": "any",
   "icons": [
     {

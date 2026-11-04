@@ -21,13 +21,13 @@ const montserrat = Montserrat({
 });
 
 export const metadata: Metadata = {
-  title: 'Flo',
-  description: 'Smart Point of Sale for restaurants',
+  title: 'Coffee First Ritual • CFR OS',
+  description: 'Good Coffee. Better Days. • Specialty Coffee & Artisanal Eggless Bakery Operating System',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'Flo',
+    title: 'CFR OS',
   },
   icons: {
     icon: [
