@@ -30,6 +30,7 @@ import {
   projectKdsOrder,
 } from './db';
 import { setupKdsWebSocket, notifyKdsUpdate } from './services/kds';
+import { syncParentOrderStatus } from './cfr/kds/sync';
 import { getJWTSecret } from './security/jwt-secret';
 import { normalizeEmail, parseCategoryIds } from './routes/auth';
 import {
@@ -666,9 +667,11 @@ export function startKdsServer(): Promise<void> {
                 WHERE id = ? AND status = ?
               `)
                     .run(status, req.params.id, expectedStatus);
-            return updated.changes === 1
-              ? { statusCode: 200, error: null }
-              : { statusCode: 409, error: 'The order item changed before it could be updated' };
+            if (updated.changes === 1) {
+              syncParentOrderStatus(db, item.order_id);
+              return { statusCode: 200, error: null };
+            }
+            return { statusCode: 409, error: 'The order item changed before it could be updated' };
           })
           .immediate();
 

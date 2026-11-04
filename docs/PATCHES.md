@@ -107,3 +107,19 @@ Each patch must be minimal (under 10 lines) and immediately delegate to modules 
 
 ---
 
+## Seam 008: KDS Item Status to Parent Order Status Synchronization
+
+- **Target Files**:
+  - `main/routes/order-items.ts` (~lines 18, 323)
+  - `main/routes/kds.ts` (~lines 8, 441)
+  - `main/kds-server.ts` (~lines 33, 670)
+  - `main/services/kds.ts` (~lines 26, 556)
+  - `main/routes/orders.ts` (~lines 66, 5390, 6171)
+- **CFR Module**: `main/cfr/kds/sync.ts` (`syncParentOrderStatus`)
+- **Date**: 2026-11-05
+- **Purpose**: Automatically propagates kitchen item status updates from KDS (pending, preparing, ready, served) to the parent order's status in `orders` table. When kitchen staff marks all active items in an order ready, the parent order transitions to `'ready'`, causing the Customer Display (`/customer-display/`) to immediately move the order into the "Ready for Pickup" column with chime notification. Also handles item cancellations, restorations, and preserves terminal order states (`completed`, `cancelled`).
+- **Upstream Risk**: Zero. No FloCafe schema modifications. The function runs synchronously inside existing database transactions and updates SQLite timestamps (`ready_at`, `cooking_started_at`, `served_at`, `updated_at`).
+
+---
+
+

@@ -63,6 +63,7 @@ import {
   type PriceOverrideInput,
 } from '../services/item-price-override';
 import { notifyKdsUpdate, notifyOrderUpdated } from '../services/kds';
+import { syncParentOrderStatus } from '../cfr/kds/sync';
 import { cloudSync } from '../services/cloud-sync';
 import {
   validateOrderNotes,
@@ -5386,6 +5387,7 @@ router.patch(
             now(),
             orderId,
           );
+          syncParentOrderStatus(db, orderId);
         }
 
         syncUnpaidBillsForOrder(
@@ -6166,6 +6168,7 @@ router.patch(
           now(),
           orderId,
         );
+        syncParentOrderStatus(db, orderId);
 
         syncUnpaidBillsForOrder(
           db,

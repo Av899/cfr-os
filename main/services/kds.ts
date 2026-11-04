@@ -23,6 +23,7 @@ import { getJWTSecret } from '../security/jwt-secret';
 import { parseCategoryIds } from '../routes/auth';
 import { getUserAuthStatus, isTokenRevoked, isTokenStale } from '../middleware/security';
 import { ROLE_ACCESS, hasRole } from '../../shared/role-permissions';
+import { syncParentOrderStatus } from '../cfr/kds/sync';
 import { hasPermission } from './authorization';
 
 interface KdsClient {
@@ -551,6 +552,8 @@ function handleStatusUpdate(client: KdsClient, message: any): void {
       if (updateResult.changes !== 1) {
         return { error: 'Item status changed; refresh and try again' };
       }
+
+      syncParentOrderStatus(db, existingItem.order_id);
 
       return { success: true };
     });
