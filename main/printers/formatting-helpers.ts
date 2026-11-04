@@ -31,7 +31,7 @@ import type { PrinterCutMode } from './profiles';
 
 export type { PrintWarning };
 
-const RECEIPT_BRANDING = 'Powered by FloPOS (flopos.com)';
+const RECEIPT_BRANDING = '';
 
 const CURRENCY_TOKEN_RE = new RegExp(
   Object.keys(CURRENCY_ASCII_MAP)
@@ -484,6 +484,7 @@ export function pushCenteredWrapped(
 }
 
 export function appendPoweredByFooter(lines: string[], cols: number = 48): void {
+  if (!RECEIPT_BRANDING) return;
   lines.push('', '');
   for (const line of wrapText(RECEIPT_BRANDING, cols)) {
     lines.push('{CENTER}{FONT_B}' + line + '{/FONT_B}{/CENTER}');

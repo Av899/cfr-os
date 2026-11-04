@@ -206,6 +206,7 @@ function printOnlineOrderBanner(
 }
 
 function printPoweredByFooter(enc: ReceiptPrinterEncoder, columns: number): void {
+  if (!RECEIPT_BRANDING_NAME) return;
   enc
     .align('center')
     .size('small')

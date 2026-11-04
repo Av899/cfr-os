@@ -571,7 +571,7 @@ export function generateBillHtml(
     <div class="footer">
       ${messages?.footerNote ? `<p>${escapeHtml(messages.footerNote.text)}</p>` : `<p>${escapeHtml(L.thankYou)}</p>`}
       ${hasTax ? `<p>${escapeHtml(L.taxIncluded)}</p>` : ''}
-      <p class="powered-by">${escapeHtml(RECEIPT_BRANDING_NAME)}</p>
+      ${RECEIPT_BRANDING_NAME ? `<p class="powered-by">${escapeHtml(RECEIPT_BRANDING_NAME)}</p>` : ''}
     </div>
   </div>
 

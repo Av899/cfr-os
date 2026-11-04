@@ -146,6 +146,24 @@ Each patch must be minimal (under 10 lines) and immediately delegate to modules 
   5. Sets default store setting `autoPrintBill: true` with persistent migration to version 7 so bills print automatically after checkout.
 - **Upstream Risk**: Zero. Thermal printer ESC/POS printing is completely untouched; web/browser printing waits for image decode and falls back to offscreen iframe when `window.open` is blocked.
 
+---
+
+## Seam 010: Removal of "Powered by FloPOS" Receipt Branding
+
+- **Target Files**:
+  - `frontend/src/lib/printer/branding.ts` (lines 1-3)
+  - `frontend/src/lib/printer/web-print.ts` (line 574)
+  - `frontend/src/lib/printer/receipt-encoder.ts` (lines 208-210)
+  - `frontend/src/lib/printer/tax-bill-encoder.ts` (lines 88-90)
+  - `main/printers/formatting-helpers.ts` (lines 34, 486-488)
+  - `main/printers/document-menu.ts` (line 142)
+- **Date**: 2026-11-05
+- **Purpose**: Strips the hardcoded "Powered by FloPOS (flopos.com)" and "Powered by FloCafe" branding from the receipt and bill footers across both web-print (browser HTML) and thermal ESC/POS byte encoders.
+- **Upstream Risk**: Zero. Conditional checks guard the footer lines; when empty, no empty lines or branding tags are appended.
+
+---
+
+
 
 ---
 
