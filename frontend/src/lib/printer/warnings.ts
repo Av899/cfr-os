@@ -340,7 +340,7 @@ function printerOfflineFixHint(): string {
     const lang = usePosSettingsStore.getState().language ?? 'en';
     const locale = LANGUAGES[lang]?.locale ?? 'en';
     const messages = getCachedMessages(lang) ?? getCachedMessages('en') ?? {};
-    const t = createTranslator({ locale, messages }) as unknown as (key: string) => string;
+    const t = createTranslator({ locale, messages, onError: () => {} }) as unknown as (key: string) => string;
     return t('printWarnings.printerOfflineHint');
   } catch {
     return "Printer isn't responding. Make sure it's powered on and connected, then check Windows: open the printer's queue and turn off \"Use Printer Offline\" if it's checked.";

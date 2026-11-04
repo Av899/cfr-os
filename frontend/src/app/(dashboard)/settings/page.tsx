@@ -3546,6 +3546,7 @@ export default function SettingsPage() {
           ? {
               receipt_logo: form.receiptLogo ?? '',
               receipt_logo_raster: form.receiptLogoRaster ?? '',
+              bill_show_logo: Boolean(form.receiptLogo),
             }
           : {}),
       });
@@ -3597,7 +3598,11 @@ export default function SettingsPage() {
         tables_required: form.tablesRequired,
         receipt_logo: form.receiptLogo || '',
         receipt_logo_raster: form.receiptLogoRaster || '',
+        bill_show_logo: Boolean(form.receiptLogo),
       });
+      if (form.receiptLogo) {
+        posSettings.setBillShowLogo(true);
+      }
       updateCurrentTenant({
         currency: form.currency,
         timezone: form.timezone,

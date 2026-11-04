@@ -118,6 +118,91 @@ export async function ensureReceiptMessagesLoaded(lang: Language): Promise<Langu
   }
 }
 
+function waitForDocumentImages(doc: Document): Promise<void> {
+  try {
+    const images = Array.from(doc.images);
+    if (images.length === 0) return Promise.resolve();
+    return Promise.all(
+      images.map((img) => {
+        if (img.complete) return Promise.resolve();
+        if (typeof img.decode === 'function') {
+          return img.decode().catch(() => {});
+        }
+        return new Promise<void>((resolve) => {
+          img.onload = () => resolve();
+          img.onerror = () => resolve();
+        });
+      }),
+    ).then(() => new Promise<void>((resolve) => setTimeout(resolve, 80)));
+  } catch {
+    return Promise.resolve();
+  }
+}
+
+function printHtmlViaHiddenIframe(html: string): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    if (typeof window === 'undefined') {
+      return resolve();
+    }
+    try {
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.left = '-9999px';
+      iframe.style.top = '-9999px';
+      iframe.style.width = '800px';
+      iframe.style.height = '600px';
+      iframe.style.border = '0';
+      iframe.style.opacity = '0';
+      iframe.style.pointerEvents = 'none';
+      iframe.style.zIndex = '-9999';
+      document.body.appendChild(iframe);
+
+      const doc = iframe.contentWindow?.document;
+      if (!doc) {
+        try {
+          document.body.removeChild(iframe);
+        } catch {}
+        return reject(new Error('Cannot access iframe document'));
+      }
+
+      doc.open();
+      doc.write(html);
+      doc.close();
+
+      const trigger = async () => {
+        try {
+          await waitForDocumentImages(doc);
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+          setTimeout(() => {
+            try {
+              document.body.removeChild(iframe);
+            } catch {}
+            resolve();
+          }, 1000);
+        } catch (err) {
+          try {
+            document.body.removeChild(iframe);
+          } catch {}
+          reject(err);
+        }
+      };
+
+      if (doc.readyState === 'complete') {
+        setTimeout(() => {
+          void trigger();
+        }, 50);
+      } else {
+        iframe.onload = () => {
+          void trigger();
+        };
+      }
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
 /** Generate HTML for A4/A5 printing and open print dialog. */
 export async function printWebBill(
   bill: Bill,
@@ -134,10 +219,6 @@ export async function printWebBill(
         ? window.open('', '_blank', 'width=800,height=600')
         : null
       : reservedWindow;
-  if (!printWindow) {
-    toast.error('Please allow popups to print bills');
-    throw new Error('Popup window was blocked by browser');
-  }
 
   // Ensure print languages are loaded before synchronous document build.
   let warnings: PrintWarning[];
@@ -152,13 +233,13 @@ export async function printWebBill(
     }));
     html = generateBillHtml(bill, tenant, { ...opts, languages });
   } catch (error) {
-    if (!printWindow.closed) printWindow.close();
+    if (printWindow && !printWindow.closed) printWindow.close();
     throw error;
   }
 
-  // 3. Write HTML and trigger print
-  if (printWindow.closed) {
-    throw new Error('Print window was closed before receipt could be printed');
+  // 2. Fall back to hidden iframe print if popup was blocked by browser or is unavailable:
+  if (!printWindow || printWindow.closed) {
+    return printHtmlViaHiddenIframe(html).then(() => warnings);
   }
 
   return new Promise<void>((resolve, reject) => {
@@ -184,13 +265,19 @@ export async function printWebBill(
       }
     };
 
-    const triggerPrint = () => {
+    const triggerPrint = async () => {
       if (settled) return;
       try {
         if (printWindow.closed) {
           settle(new Error('Print window was closed before receipt could be printed'));
           return;
         }
+        await waitForDocumentImages(printWindow.document);
+        if (printWindow.closed) {
+          settle(new Error('Print window was closed before receipt could be printed'));
+          return;
+        }
+        printWindow.focus();
         printWindow.print();
         settle();
       } catch (err) {
@@ -206,10 +293,10 @@ export async function printWebBill(
       printWindow.document.close();
 
       if (printWindow.document.readyState === 'complete') {
-        triggerPrint();
+        void triggerPrint();
       } else {
         printWindow.onload = () => {
-          triggerPrint();
+          void triggerPrint();
         };
 
         // Poll window state to prevent hanging promise if user closes popup while loading
@@ -219,7 +306,7 @@ export async function printWebBill(
           if (printWindow.closed) {
             settle(new Error('Print window was closed before receipt could be printed'));
           } else if (printWindow.document.readyState === 'complete' || elapsed >= 3000) {
-            triggerPrint();
+            void triggerPrint();
           }
         }, 50);
       }

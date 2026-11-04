@@ -311,6 +311,101 @@ class PrinterService {
     return typeof window === 'undefined' ? null : window.open('', '_blank');
   }
 
+  private printViaHiddenIframe(htmlContent: string, paperWidth: 58 | 80): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      if (typeof window === 'undefined') return resolve();
+      try {
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.left = '-9999px';
+        iframe.style.top = '-9999px';
+        iframe.style.width = '800px';
+        iframe.style.height = '600px';
+        iframe.style.border = '0';
+        iframe.style.opacity = '0';
+        iframe.style.pointerEvents = 'none';
+        iframe.style.zIndex = '-9999';
+        document.body.appendChild(iframe);
+
+        const doc = iframe.contentWindow?.document;
+        if (!doc) {
+          try {
+            document.body.removeChild(iframe);
+          } catch {}
+          return reject(new Error('Cannot access iframe document'));
+        }
+
+        const mmWidth = paperWidth === 58 ? '58mm' : '80mm';
+        doc.open();
+        doc.write(`<!DOCTYPE html><html><head><style>
+          @page { size: ${mmWidth} auto; margin: 0; }
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body {
+            font-family: 'Courier New', 'Noto Sans Devanagari', 'Nirmala UI', 'Kohinoor Devanagari', 'Devanagari Sangam MN', 'Noto Sans Thai', 'Leelawadee UI', Thonburi, monospace;
+            font-size: 12px;
+            line-height: 1.2;
+            width: ${mmWidth};
+            max-width: ${mmWidth};
+            margin: 0 auto;
+            padding: 4px;
+            text-align: left;
+          }
+          @media print {
+            body { width: ${mmWidth} !important; max-width: ${mmWidth} !important; }
+            @page { size: ${mmWidth} auto; margin: 0; }
+          }
+        </style></head><body>${htmlContent}</body></html>`);
+        doc.close();
+
+        const trigger = async () => {
+          try {
+            const images = Array.from(doc.images);
+            if (images.length > 0) {
+              await Promise.all(
+                images.map((img) => {
+                  if (img.complete) return Promise.resolve();
+                  if (typeof img.decode === 'function') {
+                    return img.decode().catch(() => {});
+                  }
+                  return new Promise<void>((res) => {
+                    img.onload = () => res();
+                    img.onerror = () => res();
+                  });
+                }),
+              );
+              await new Promise((res) => setTimeout(res, 80));
+            }
+            iframe.contentWindow?.focus();
+            iframe.contentWindow?.print();
+            setTimeout(() => {
+              try {
+                document.body.removeChild(iframe);
+              } catch {}
+              resolve();
+            }, 1000);
+          } catch (err) {
+            try {
+              document.body.removeChild(iframe);
+            } catch {}
+            reject(err);
+          }
+        };
+
+        if (doc.readyState === 'complete') {
+          setTimeout(() => {
+            void trigger();
+          }, 50);
+        } else {
+          iframe.onload = () => {
+            void trigger();
+          };
+        }
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
+
   async printViaBrowser(
     htmlContent: string,
     paperWidth: 58 | 80,
@@ -318,8 +413,8 @@ class PrinterService {
   ): Promise<void> {
     const printWindow =
       reservedWindow === undefined ? this.reserveBrowserPrintWindow() : reservedWindow;
-    if (!printWindow) {
-      throw new Error('Please allow popups to print');
+    if (!printWindow || printWindow.closed) {
+      return this.printViaHiddenIframe(htmlContent, paperWidth);
     }
 
     const mmWidth = paperWidth === 58 ? '58mm' : '80mm';

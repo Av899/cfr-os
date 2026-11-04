@@ -167,7 +167,7 @@ export const usePosSettingsStore = create<PosSettingsState>()(
       printerEnabled: false,
       printerPrintMode: 'escpos',
       autoPrintKot: false,
-      autoPrintBill: false,
+      autoPrintBill: true,
       whatsappShareEnabled: true,
       // Web print defaults
       defaultPrintMode: 'thermal',
@@ -295,6 +295,9 @@ export const usePosSettingsStore = create<PosSettingsState>()(
           const logo = d.receipt_logo ?? d.receiptLogo;
           if (logo !== undefined) {
             updates.receiptLogo = logo || '';
+            if (logo && updates.billShowLogo === undefined) {
+              updates.billShowLogo = true;
+            }
           }
           const logoRaster = d.receipt_logo_raster ?? d.receiptLogoRaster;
           if (logoRaster !== undefined) {
@@ -366,7 +369,7 @@ export const usePosSettingsStore = create<PosSettingsState>()(
           ),
         ) as PosSettingsState,
       // Migrates legacy store keys (GSTIN rename, removed A4/A5 paper sizes).
-      version: 5,
+      version: 7,
       migrate: (persisted, version) => {
         const state = persisted as Record<string, unknown>;
         if (version < 1) {
@@ -403,6 +406,14 @@ export const usePosSettingsStore = create<PosSettingsState>()(
           state.receiptLogo ??= '';
           state.receiptLogoRaster ??= '';
           state.billShowLogo ??= false;
+        }
+        if (version < 6) {
+          state.autoPrintBill = true;
+        }
+        if (version < 7) {
+          if (state.receiptLogo || state.receipt_logo) {
+            state.billShowLogo = true;
+          }
         }
         return state as unknown as PosSettingsState;
       },

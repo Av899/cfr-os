@@ -122,4 +122,31 @@ Each patch must be minimal (under 10 lines) and immediately delegate to modules 
 
 ---
 
+## Seam 009: POS Auto-Print Bill, Popup-Safe Printing & Store Details Logo Display
+
+- **Target Files**:
+  - `frontend/src/app/(dashboard)/pos/page.tsx` (~lines 2293-2297)
+  - `frontend/src/app/(dashboard)/settings/page.tsx` (~lines 3546, 3598-3603)
+  - `frontend/src/components/pos/PaymentModal.tsx` (~lines 16, 187-202, 1218, 2288-2296)
+  - `frontend/src/hooks/usePrinter.ts` (~lines 344, 444, 627)
+  - `frontend/src/lib/printer/web-print.ts` (~lines 121-175, 208-275)
+  - `frontend/src/lib/printer/PrinterService.ts` (~lines 314-387, 401-404)
+  - `frontend/src/store/pos-settings.ts` (~lines 170, 298, 369, 407-417)
+  - `frontend/src/lib/printer/warnings.ts` (~line 197)
+  - `main/routes/settings.ts` (~lines 518-523)
+- **Date**: 2026-11-05
+- **Purpose**:
+  1. Fixes bill printing failure on payment completion by passing `force = true` when `autoPrintBill` is enabled.
+  2. Solves browser popup blocker issues where `window.open` after async payment network calls is blocked, by adding a reliable offscreen `<iframe>` fallback (`printHtmlViaHiddenIframe`).
+  3. Fixes receipt logo not displaying on the bill:
+     - Waits for document images/data URIs to finish loading and decoding before invoking `.print()`.
+     - Ensures offscreen iframe is properly styled (`left: -9999px; width: 800px; height: 600px; opacity: 0`) rather than `visibility: hidden; width: 0; height: 0`, preventing browsers from suppressing image decoding.
+     - Guarantees store logo uploaded in Store Details (`receiptLogo`) automatically enables `billShowLogo: true` and is reliably passed to bill documents.
+  4. Adds explicit, user-facing "Print Bill" / "Reprint Bill" action button directly in the `PaymentModal` post-payment confirmation screen.
+  5. Sets default store setting `autoPrintBill: true` with persistent migration to version 7 so bills print automatically after checkout.
+- **Upstream Risk**: Zero. Thermal printer ESC/POS printing is completely untouched; web/browser printing waits for image decode and falls back to offscreen iframe when `window.open` is blocked.
+
+
+---
+
 

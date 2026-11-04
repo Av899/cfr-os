@@ -515,7 +515,12 @@ router.put('/business', requirePermission('settings.manage'), (req: Request, res
       bill_show_customer_phone,
       bill_show_table_number,
       bill_delivery_show_customer_phone_always,
-      bill_show_logo: boolFlag(bill_show_logo),
+      bill_show_logo:
+        bill_show_logo !== undefined
+          ? boolFlag(bill_show_logo)
+          : normalizedReceiptLogo && normalizedReceiptLogo.length > 0
+            ? 'true'
+            : undefined,
       receipt_logo: normalizedReceiptLogo,
       receipt_logo_raster: normalizedReceiptLogoRaster,
       ...localeUpdates,

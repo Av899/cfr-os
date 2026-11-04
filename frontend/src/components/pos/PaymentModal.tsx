@@ -13,7 +13,11 @@ import {
   ChevronDown,
   Users,
   QrCode,
+  Printer,
 } from 'lucide-react';
+import { usePrinterStore } from '@/hooks/usePrinter';
+import { usePosSettingsStore } from '@/store/pos-settings';
+import { showPrintWarningsToast } from '@/lib/printer/warnings-toast';
 import { UpiPaymentModal, type UpiPaymentResult } from '@/cfr/components/UpiPaymentModal';
 import { Button } from '@/components/ui/button';
 import api, {
@@ -180,6 +184,22 @@ export default function PaymentModal({
   const toMinorUnits = (amount: number) => Math.round(amount * minorFactor);
 
   const [justPaid, setJustPaid] = useState(false);
+  const [receiptPrinted, setReceiptPrinted] = useState(false);
+
+  const handlePrintReceipt = useCallback(async () => {
+    try {
+      const tenant = useAuthStore.getState().currentTenant;
+      if (!tenant) return;
+      const { data } = await api.get(`/bills/${bill.id}`).catch(() => ({ data: null }));
+      const billToPrint = data?.bill ?? bill;
+      setReceiptPrinted(true);
+      const printWarnings = await usePrinterStore.getState().printBill(billToPrint, tenant);
+      showPrintWarningsToast(printWarnings);
+    } catch (err) {
+      console.error('[PaymentModal] Print receipt error:', err);
+      toast.error(t('receiptPrintFailed') || 'Receipt print failed');
+    }
+  }, [bill, t]);
   const [sendingWa, setSendingWa] = useState(false);
   const [pointsEarned, setPointsEarned] = useState(0);
   const [payments, setPayments] = useState<Payment[]>(
@@ -1195,6 +1215,9 @@ export default function PaymentModal({
         toast.success(t('paymentRecorded'));
       }
       setJustPaid(true);
+      if (usePosSettingsStore.getState().autoPrintBill) {
+        void handlePrintReceipt();
+      }
     } catch (error: unknown) {
       const response = (
         error as {
@@ -2262,6 +2285,15 @@ export default function PaymentModal({
         <div className="px-5 pb-5 border-t border-border pt-3 space-y-2">
           {justPaid ? (
             <>
+              <Button
+                type="button"
+                onClick={handlePrintReceipt}
+                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
+                size="lg"
+              >
+                <Printer size={18} className="me-2" />
+                {receiptPrinted ? `${tCommon('reprint')} Bill` : `${tCommon('print')} Bill`}
+              </Button>
               {cartCustomer?.phone &&
                 (isWhatsAppReady ? (
                   <Button

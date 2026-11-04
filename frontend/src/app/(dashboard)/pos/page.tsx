@@ -2290,9 +2290,9 @@ export default function POSPage() {
     setCheckoutTable(null);
     refreshTables();
 
-    if (bill) {
+    if (bill && autoPrintBill) {
       try {
-        await printBillForTenant(await fetchLatestBill(bill.id));
+        await printBillForTenant(await fetchLatestBill(bill.id), true);
       } catch {
         toast.error(t('receiptPrintFailed'));
       }
