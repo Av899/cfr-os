@@ -24,6 +24,8 @@ import { useFormatCurrency } from '@/hooks/useFormatCurrency';
 import { useFormatDate } from '@/hooks/useFormatDate';
 import { useFormatNumber } from '@/hooks/useFormatNumber';
 import { tenantCan } from '@/lib/permissions';
+import { CfrInventoryView } from '@/cfr/components/CfrInventoryView';
+import { Coffee } from 'lucide-react';
 
 const SUPPLY_UNITS = ['each', 'g', 'kg', 'ml', 'l'] as const;
 type SupplyUnit = (typeof SUPPLY_UNITS)[number];
@@ -112,7 +114,7 @@ export default function InventoryPage() {
   const fmtNum = useFormatNumber();
   const canManage = tenantCan(currentTenant, 'inventory.manage');
 
-  const [tab, setTab] = useState('supplies');
+  const [tab, setTab] = useState('cfr');
   const [supplies, setSupplies] = useState<Supply[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [movements, setMovements] = useState<SupplyMovement[]>([]);
@@ -476,11 +478,24 @@ export default function InventoryPage() {
         }}
         className="dashboard-scroll-frame flex min-h-0 flex-1 flex-col"
       >
-        <TabsList className="shrink-0">
+        <TabsList className="shrink-0 gap-1">
+          <TabsTrigger
+            value="cfr"
+            className="flex items-center gap-1.5 font-bold data-[state=active]:bg-[#8B5E3C] data-[state=active]:text-white"
+          >
+            <Coffee size={15} /> CFR FEFO Stock & BOM
+          </TabsTrigger>
           <TabsTrigger value="supplies">{t('tabSupplies')}</TabsTrigger>
           <TabsTrigger value="recipes">{t('tabRecipes')}</TabsTrigger>
           <TabsTrigger value="movements">{t('tabMovements')}</TabsTrigger>
         </TabsList>
+
+        <TabsContent
+          value="cfr"
+          className="dashboard-scroll-pane flex min-h-0 flex-1 flex-col pt-2"
+        >
+          <CfrInventoryView />
+        </TabsContent>
 
         <TabsContent
           value="supplies"

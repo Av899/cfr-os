@@ -377,3 +377,4 @@ export function seedStandardCfrRecipes(db: Database.Database): void {
 
   console.log('[CFR BOM] Successfully seeded standard CFR recipes & sub-recipes.');
 }
+
