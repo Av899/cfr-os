@@ -144,6 +144,7 @@ Each patch must be minimal (under 10 lines) and immediately delegate to modules 
      - Guarantees store logo uploaded in Store Details (`receiptLogo`) automatically enables `billShowLogo: true` and is reliably passed to bill documents.
   4. Adds explicit, user-facing "Print Bill" / "Reprint Bill" action button directly in the `PaymentModal` post-payment confirmation screen.
   5. Sets default store setting `autoPrintBill: true` with persistent migration to version 7 so bills print automatically after checkout.
+  6. Eliminates duplicate printing by removing the redundant print trigger from `handlePaymentComplete` when clicking "Done"; the bill prints once upon payment success and provides on-demand reprint if needed.
 - **Upstream Risk**: Zero. Thermal printer ESC/POS printing is completely untouched; web/browser printing waits for image decode and falls back to offscreen iframe when `window.open` is blocked.
 
 ---

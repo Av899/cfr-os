@@ -2284,19 +2284,10 @@ export default function POSPage() {
   };
 
   const handlePaymentComplete = async () => {
-    const bill = paymentBill; // capture before clearing state
     setPaymentBill(null);
     setCheckoutOverridePin(undefined);
     setCheckoutTable(null);
     refreshTables();
-
-    if (bill && autoPrintBill) {
-      try {
-        await printBillForTenant(await fetchLatestBill(bill.id), true);
-      } catch {
-        toast.error(t('receiptPrintFailed'));
-      }
-    }
   };
 
   const cartPanelProps = {
