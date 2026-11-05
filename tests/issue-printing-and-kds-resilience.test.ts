@@ -46,6 +46,8 @@ type MockWindow = {
   printCalls: number;
   print: () => void;
   onload: (() => void) | null;
+  focus?: () => void;
+  close?: () => void;
 };
 
 function createMockWindow(readyState: string): MockWindow {
@@ -60,6 +62,8 @@ function createMockWindow(readyState: string): MockWindow {
     printCalls: 0,
     print: () => { win.printCalls += 1; },
     onload: null,
+    focus: () => {},
+    close: () => { win.closed = true; },
   };
   return win;
 }

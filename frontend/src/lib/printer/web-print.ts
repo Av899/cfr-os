@@ -220,6 +220,11 @@ export async function printWebBill(
         : null
       : reservedWindow;
 
+  if (!printWindow) {
+    toast.error('Please allow popups to print bills');
+    throw new Error('Popup window was blocked by browser');
+  }
+
   // Ensure print languages are loaded before synchronous document build.
   let warnings: PrintWarning[];
   let html: string;
@@ -233,13 +238,13 @@ export async function printWebBill(
     }));
     html = generateBillHtml(bill, tenant, { ...opts, languages });
   } catch (error) {
-    if (printWindow && !printWindow.closed) printWindow.close();
+    if (!printWindow.closed) printWindow.close?.();
     throw error;
   }
 
-  // 2. Fall back to hidden iframe print if popup was blocked by browser or is unavailable:
-  if (!printWindow || printWindow.closed) {
-    return printHtmlViaHiddenIframe(html).then(() => warnings);
+  // 2. Reject early if print window was closed before writing receipt
+  if (printWindow.closed) {
+    throw new Error('Print window was closed before receipt could be printed');
   }
 
   return new Promise<void>((resolve, reject) => {
@@ -253,12 +258,20 @@ export async function printWebBill(
       }
     };
 
+    const closePrintWindow = () => {
+      try {
+        if (printWindow && !printWindow.closed) {
+          printWindow.close?.();
+        }
+      } catch {}
+    };
+
     const settle = (err?: Error) => {
       if (settled) return;
       settled = true;
       cleanup();
       if (err) {
-        if (!printWindow.closed) printWindow.close();
+        closePrintWindow();
         reject(err);
       } else {
         resolve();
@@ -277,13 +290,20 @@ export async function printWebBill(
           settle(new Error('Print window was closed before receipt could be printed'));
           return;
         }
-        printWindow.focus();
+        if (typeof printWindow.addEventListener === 'function') {
+          printWindow.addEventListener('afterprint', () => {
+            closePrintWindow();
+          });
+        }
+        printWindow.focus?.();
         printWindow.print();
         settle();
       } catch (err) {
         console.error('Failed to trigger print on window:', err);
         toast.error('Failed to open print dialog');
         settle(err instanceof Error ? err : new Error(String(err)));
+      } finally {
+        setTimeout(closePrintWindow, 150);
       }
     };
 

@@ -320,6 +320,46 @@ async function run() {
     });
     assert('fallback triggered on backend No default printer error', browserPrintExecuted === true);
     assert('toast notification shown on API error fallback', toastMessage === 'No thermal printer configured — printing via system print');
+
+    // Test Suite 3B: printWebBill popup window auto-close on print
+    console.log('\nTest Suite 3B: printWebBill Popup Window Auto-Close Lifecycle');
+    const { webPrint } = loadFrontendModules();
+    let mockClosed = false;
+    let mockPrintCalled = false;
+    const mockPrintWindow = {
+      document: {
+        open: () => {},
+        write: (_h: string) => {},
+        close: () => {},
+        readyState: 'complete',
+      },
+      closed: false,
+      print: () => {
+        mockPrintCalled = true;
+      },
+      focus: () => {},
+      close: () => {
+        mockClosed = true;
+        mockPrintWindow.closed = true;
+      },
+      addEventListener: (_event: string, _handler: () => void) => {},
+    };
+
+    const origWindow = (global as any).window;
+    try {
+      (global as any).window = { open: () => mockPrintWindow };
+      const printP = webPrint.printWebBill(
+        { id: 1, bill_number: 'B-1', total: 10, balance: 0, items: [] } as any,
+        { business_name: 'Flo Test', currency: 'INR', country: 'IN', timezone: 'UTC' } as any,
+        { language: 'en' as any }
+      );
+      await printP;
+      await new Promise((r) => setTimeout(r, 200));
+      assert('printWebBill triggers print on popup window', mockPrintCalled === true);
+      assert('printWebBill auto-closes popup window after printing (no leftover window)', mockClosed === true);
+    } finally {
+      (global as any).window = origWindow;
+    }
   }
 
   // ── 4. Generate Visual & Reviewer Evidence Artifacts ───────────────────────
