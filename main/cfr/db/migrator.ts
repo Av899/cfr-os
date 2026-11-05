@@ -333,5 +333,13 @@ export function runCfrMigrations(db: Database.Database): void {
     console.log(`${logPrefix} Successfully seeded ${CFR_STAPLE_INGREDIENTS.length} eggless staple ingredients.`);
   }
 
+  // 4. Seed standard CFR recipes & sub-recipes if empty
+  try {
+    const { seedStandardCfrRecipes } = require('../inventory/bom');
+    seedStandardCfrRecipes(db);
+  } catch (err: any) {
+    console.error('[CFR DB] Failed to seed recipes:', err?.message || err);
+  }
+
   console.log(`${logPrefix} CFR schema v${CFR_SCHEMA_VERSION} initialized successfully.`);
 }

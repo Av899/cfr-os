@@ -165,8 +165,22 @@ Each patch must be minimal (under 10 lines) and immediately delegate to modules 
 
 ---
 
+## Seam 011: CFR Gram-Level BOM & FEFO Inventory Engine (Week 4)
 
+- **Target Files**:
+  - `main/routes/orders.ts` (lines 2106-2113, 5381-5388)
+  - `main/cfr/inventory/fefo.ts`
+  - `main/cfr/inventory/bom.ts`
+  - `main/cfr/types/inventory.ts`
+  - `main/cfr/routes/cfr-router.ts` (lines 540-690)
+  - `main/cfr/db/migrator.ts` (lines 337-343)
+- **Date**: 2026-11-05
+- **Purpose**:
+  1. Integrates gram-level Bill of Materials (BOM) deduction into order lifecycle: when an order is created, all leaf ingredients (coffee beans, milk, flour, butter) are automatically resolved (including recursive sub-recipes and addon substitutions) and deducted.
+  2. Implements First-Expiry, First-Out (FEFO) stock allocation: stock lots with the earliest expiry dates are consumed first across batches.
+  3. Reverses inventory deductions automatically if an order is cancelled or voided.
+  4. Provides REST API endpoints for stock levels, lot receiving, and zero-revenue barista waste/dial-in logging (`/api/cfr/inventory/*`).
+- **Upstream Risk**: Zero. FloCafe's standard order processing continues uninterrupted; BOM deductions run asynchronously in safe try-catch blocks without blocking transactions.
 
----
 
 

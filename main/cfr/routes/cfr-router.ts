@@ -19,6 +19,20 @@ import {
   getPaymentRecord,
   InvalidUtrError,
 } from '../payments/reconciler';
+import {
+  allocateFefoStock,
+  reverseOrderFefoStock,
+  receiveStockLot,
+  recordWaste,
+  getInventoryStockLevels,
+} from '../inventory/fefo';
+import {
+  deductOrderBOM,
+  reverseOrderBOM,
+  resolveOrderItemIngredients,
+  seedStandardCfrRecipes,
+} from '../inventory/bom';
+import { CfrWasteReason } from '../types/inventory';
 
 export const cfrRouter = Router();
 
@@ -524,4 +538,172 @@ cfrRouter.get('/payments/:id', (req: Request, res: Response) => {
     res.status(500).json({ error: error?.message || 'Failed to fetch payment' });
   }
 });
+
+/**
+ * ── Week 4: Gram-Level BOM & FEFO Inventory Endpoints ───────────────────────
+ */
+
+/**
+ * GET /api/cfr/inventory/stock
+ * Returns current stock levels, active FEFO lots, and par level alerts.
+ */
+cfrRouter.get('/inventory/stock', (req: Request, res: Response) => {
+  try {
+    const db = getDatabase();
+    const ingredientId = req.query.ingredient_id ? String(req.query.ingredient_id) : undefined;
+    const stockLevels = getInventoryStockLevels(db, ingredientId);
+
+    const lowStockItems = stockLevels.filter((item) => item.is_low_stock);
+
+    res.json({
+      total_ingredients: stockLevels.length,
+      low_stock_count: lowStockItems.length,
+      stock: stockLevels,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to fetch inventory stock' });
+  }
+});
+
+/**
+ * POST /api/cfr/inventory/lots
+ * Receives a new stock shipment lot.
+ */
+cfrRouter.post('/inventory/lots', (req: Request, res: Response) => {
+  try {
+    const { ingredient_id, batch_no, supplier_name, expiry_date, initial_qty, unit_cost_paise, received_at } = req.body;
+
+    if (!ingredient_id || !batch_no || !expiry_date || initial_qty === undefined || Number(initial_qty) <= 0) {
+      return res.status(400).json({
+        error: 'Missing or invalid lot details (ingredient_id, batch_no, expiry_date [YYYY-MM-DD], initial_qty > 0 required)',
+      });
+    }
+
+    const db = getDatabase();
+    const lot = receiveStockLot(db, {
+      ingredient_id,
+      batch_no,
+      supplier_name,
+      expiry_date,
+      initial_qty: Number(initial_qty),
+      unit_cost_paise: Number(unit_cost_paise) || 0,
+      received_at,
+    });
+
+    res.status(201).json({
+      message: `Stock lot "${batch_no}" received successfully`,
+      lot,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to receive stock lot' });
+  }
+});
+
+/**
+ * POST /api/cfr/inventory/waste
+ * Logs zero-revenue barista waste (dial-in shots, milk purges, expired items, dropped pastries).
+ */
+cfrRouter.post('/inventory/waste', (req: Request, res: Response) => {
+  try {
+    const { ingredient_id, qty, reason, lot_id } = req.body;
+
+    if (!ingredient_id || qty === undefined || Number(qty) <= 0 || !reason) {
+      return res.status(400).json({
+        error: 'Missing required waste fields (ingredient_id, qty > 0, reason)',
+      });
+    }
+
+    const db = getDatabase();
+    const result = recordWaste(db, {
+      ingredient_id,
+      qty: Number(qty),
+      reason,
+      lot_id: lot_id || null,
+    });
+
+    res.status(201).json({
+      message: 'Waste logged successfully',
+      result,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to log waste' });
+  }
+});
+
+/**
+ * GET /api/cfr/inventory/movements
+ * Returns stock movement audit ledger.
+ */
+cfrRouter.get('/inventory/movements', (req: Request, res: Response) => {
+  try {
+    const db = getDatabase();
+    const { ingredient_id, order_id, type, limit = 100 } = req.query;
+
+    let query = `
+      SELECT sm.*, ing.name as ingredient_name, ing.base_unit
+      FROM cfr_stock_movements sm
+      JOIN cfr_ingredients ing ON sm.ingredient_id = ing.id
+      WHERE 1=1
+    `;
+    const params: unknown[] = [];
+
+    if (ingredient_id) {
+      query += ' AND sm.ingredient_id = ?';
+      params.push(String(ingredient_id));
+    }
+    if (order_id) {
+      query += ' AND sm.order_id = ?';
+      params.push(String(order_id));
+    }
+    if (type) {
+      query += ' AND sm.type = ?';
+      params.push(String(type));
+    }
+
+    query += ' ORDER BY sm.created_at DESC LIMIT ?';
+    params.push(Number(limit));
+
+    const movements = db.prepare(query).all(...params);
+
+    res.json({
+      total: movements.length,
+      movements,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to fetch stock movements' });
+  }
+});
+
+/**
+ * GET /api/cfr/recipes
+ * Lists all recipes with their line items.
+ */
+cfrRouter.get('/recipes', (req: Request, res: Response) => {
+  try {
+    const db = getDatabase();
+    const recipes = db.prepare(`
+      SELECT * FROM cfr_recipes ORDER BY is_sub_recipe DESC, name ASC
+    `).all() as any[];
+
+    const itemStmt = db.prepare(`
+      SELECT ri.*, ing.name as ingredient_name, sub.name as sub_recipe_name
+      FROM cfr_recipe_items ri
+      LEFT JOIN cfr_ingredients ing ON ri.ingredient_id = ing.id
+      LEFT JOIN cfr_recipes sub ON ri.sub_recipe_id = sub.id
+      WHERE ri.recipe_id = ?
+    `);
+
+    for (const recipe of recipes) {
+      recipe.items = itemStmt.all(recipe.id);
+    }
+
+    res.json({
+      total: recipes.length,
+      recipes,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to fetch recipes' });
+  }
+});
+
 

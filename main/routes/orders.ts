@@ -2102,6 +2102,14 @@ router.post(
         notifyKdsUpdate();
         cloudSync.recordOrderChanged(result.order.id, 'order.created');
 
+        // Seam 011: CFR Gram-Level BOM & FEFO Inventory Deduction
+        try {
+          const { deductOrderBOM } = require('../cfr/inventory/bom');
+          deductOrderBOM(db, result.order.id, result.orderItems);
+        } catch (bomErr) {
+          console.error('[CFR BOM] Stock deduction error:', bomErr);
+        }
+
         if (result.order.customer_id) {
           try {
             syncCustomerTagCounts(db, result.order.customer_id, items);
@@ -5368,6 +5376,13 @@ router.patch(
               now(),
               currentOrder.table_id,
             );
+          }
+          // Seam 011: CFR Reverse BOM Inventory Deduction on Cancel
+          try {
+            const { reverseOrderBOM } = require('../cfr/inventory/bom');
+            reverseOrderBOM(db, orderId);
+          } catch (bomRevErr) {
+            console.error('[CFR BOM] Stock reversal error:', bomRevErr);
           }
         } else {
           db.prepare(`
