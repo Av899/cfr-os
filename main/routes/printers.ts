@@ -23,6 +23,10 @@ import {
   printMenuDocument,
 } from '../printers/thermal';
 import {
+  discoverHandler,
+  printerStatusHandler,
+} from './printer-diagnostics';
+import {
   buildDeliverySlipPrintData,
   type DeliverySlipOrderRow,
 } from '../printers/document-delivery-slip';
@@ -262,6 +266,9 @@ router.get('/supported', requirePermission('printers.manage'), (_req: Request, r
   res.json({ printers: getSupportedPrinterProfiles() });
 });
 
+// GET /api/printers/discover — discover network printers on the LAN
+router.get('/discover', requirePermission('printers.manage'), asyncHandler(discoverHandler));
+
 // GET /api/printers/:id
 router.get('/:id', requirePermission('printers.manage'), (req: Request, res: Response) => {
   try {
@@ -274,6 +281,9 @@ router.get('/:id', requirePermission('printers.manage'), (req: Request, res: Res
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+// GET /api/printers/:id/status — probe live ESC/POS printer status
+router.get('/:id/status', requirePermission('printers.manage'), asyncHandler(printerStatusHandler));
 
 // POST /api/printers — create
 router.post('/', requirePermission('printers.manage'), (req: Request, res: Response) => {

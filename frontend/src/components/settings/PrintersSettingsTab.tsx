@@ -22,6 +22,8 @@ import { useTranslations, type AppConfig } from 'use-intl';
 import { Ltr } from '@/components/layout/Ltr';
 import { Toggle } from '@/components/settings/Toggle';
 import { SettingsTabShell } from '@/components/settings/SettingsTabShell';
+import { LanPrinterDiscovery } from '@/components/settings/LanPrinterDiscovery';
+import { PrinterStatusBadge } from '@/components/settings/PrinterStatusBadge';
 import { LANGUAGES, type Language } from '@/lib/i18n';
 import {
   isTemplateCardSelected,
@@ -181,6 +183,8 @@ export function PrintersSettingsTab({
   const [editingPrinterId, setEditingPrinterId] = useState<string | null>(null);
   const [savingPrinter, setSavingPrinter] = useState(false);
   const [testingPrinterId, setTestingPrinterId] = useState<string | null>(null);
+  const [statusVersion, setStatusVersion] = useState(0);
+  const [discoveryVersion, setDiscoveryVersion] = useState(0);
   const [detectedPrinters, setDetectedPrinters] = useState<DetectedPrinter[]>([]);
   const [detectingPrinters, setDetectingPrinters] = useState(false);
   const [detectionSucceeded, setDetectionSucceeded] = useState(false);
@@ -212,7 +216,10 @@ export function PrintersSettingsTab({
   const fetchPrinters = async (signal?: AbortSignal) => {
     try {
       const res = await api.get('/printers', signal ? { signal } : undefined);
-      if (!signal?.aborted) setHwPrinters(res.data.printers || []);
+      if (!signal?.aborted) {
+        setHwPrinters(res.data.printers || []);
+        setStatusVersion((v) => v + 1);
+      }
     } catch {
       // ignore
     }
@@ -243,7 +250,14 @@ export function PrintersSettingsTab({
     return () => controller.abort();
   }, [fetchDetectedPrinters, isActive]);
 
-  const quickAddDetected = async (p: DetectedPrinter) => {
+  const quickAddDetected = async (p: {
+    name: string;
+    connectionType: 'network' | 'usb' | 'bluetooth';
+    ipAddress?: string;
+    port?: number;
+    paperWidth?: string;
+    model?: string;
+  }): Promise<boolean> => {
     setAddingDetectedName(p.name);
     try {
       const payload: {
@@ -265,8 +279,10 @@ export function PrintersSettingsTab({
       toast.success(t('printerQuickAdded', { name: p.name }));
       fetchPrinters();
       refreshHardwarePrinter();
+      return true;
     } catch {
       toast.error(t('printerAddFailed'));
+      return false;
     } finally {
       setAddingDetectedName(null);
     }
@@ -381,7 +397,10 @@ export function PrintersSettingsTab({
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => {
+                    void fetchPrinters();
                     void fetchDetectedPrinters();
+                    setDiscoveryVersion((v) => v + 1);
+                    setStatusVersion((v) => v + 1);
                   }}
                   disabled={detectingPrinters}
                   title={t('refreshList')}
@@ -399,6 +418,14 @@ export function PrintersSettingsTab({
               </div>
             )}
           </div>
+
+          {!showPrinterForm && (
+            <LanPrinterDiscovery
+              enabled={isActive}
+              refreshKey={discoveryVersion}
+              onAdd={quickAddDetected}
+            />
+          )}
 
           {/* Detected (OS-installed) printers - one-click add */}
           {!showPrinterForm && (
@@ -546,6 +573,12 @@ export function PrintersSettingsTab({
                         {t('defaultPrinter')}
                       </span>
                     )}
+                    <PrinterStatusBadge
+                      printerId={p.id}
+                      connectionType={p.connection_type}
+                      enabled={isActive}
+                      refreshKey={statusVersion}
+                    />
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {p.connection_type === 'network' ? (

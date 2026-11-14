@@ -4808,3 +4808,59 @@ export function getPrinterStatus(): { connected: boolean; printer: any } {
   const printer = getPrinterConfig();
   return { connected: !!printer, printer };
 }
+
+export function validateNetworkPrinterTarget(rawHost: string, _port?: number): string | null {
+  if (typeof rawHost !== 'string') return 'ip_address is required for network printers';
+  const trimmed = rawHost.trim();
+  if (!trimmed) return 'ip_address is required for network printers';
+
+  const unbracketed =
+    trimmed.startsWith('[') && trimmed.endsWith(']') ? trimmed.slice(1, -1).trim() : trimmed;
+  if (!unbracketed || /[\s\x00-\x1f\x7f]/.test(unbracketed)) {
+    return 'Invalid printer host or IP address';
+  }
+
+  const lowerHost = unbracketed.toLowerCase();
+  let hostEnd = lowerHost.length;
+  while (hostEnd > 0 && lowerHost.charCodeAt(hostEnd - 1) === 46) {
+    hostEnd -= 1;
+  }
+  const host = lowerHost.slice(0, hostEnd);
+  if (!host) {
+    return 'Invalid printer host or IP address';
+  }
+  if (host === 'metadata.google.internal' || host === 'metadata' || host === 'instance-data') {
+    return 'Printer address cannot target a cloud metadata service';
+  }
+
+  return null;
+}
+
+export function isKnownDriverOnlyPrinter(info: {
+  name?: string | null;
+  make?: string | null;
+  model?: string | null;
+  driver?: string | null;
+  deviceUri?: string | null;
+}): boolean {
+  const haystack = [info.name, info.make, info.model, info.driver, info.deviceUri]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+    .replace(/[_]+/g, '-');
+
+  return (
+    /\b(?:star|tsp100|tsp143|tsp650|tsp700|tsp800|sp700|mc-print|mcp20|mcp30|mcp31)\b/.test(
+      haystack,
+    ) ||
+    /\b(?:ecotank|workforce|stylus|expression|inkjet|laserjet|deskjet|officejet|pixma|maxify|imageclass)\b/.test(
+      haystack,
+    ) ||
+    /\b(?:et-\d\w*|wf-\d\w*|l3\d*|l4\d*|tm[-\s]?l\d*)\b/.test(haystack) ||
+    /\b(?:zebra|zd\d|gk420|gx420|zp450|zt\d|dymo|labelwriter|rollo|brother|ql-\d|td-\d|bixolon\s+slp|label)\b/.test(
+      haystack,
+    ) ||
+    /\b(?:canon|hewlett|hp\b|lexmark|ricoh|kyocera|xerox|konica|minolta|pantum)\b/.test(haystack) ||
+    /\b(?:pdf\w*|xps|onenote|fax|microsoft\s+print|send\s+to|save\s+as|cups-pdf)\b/.test(haystack)
+  );
+}

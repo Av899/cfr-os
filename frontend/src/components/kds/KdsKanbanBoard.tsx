@@ -246,7 +246,7 @@ const KanbanOrderCard = memo(function KanbanOrderCard({
       <div className={`rounded-xl border-2 ${config.border} bg-card p-3 flex flex-col shadow-sm`}>
         <div className="flex justify-between items-center mb-2 gap-2">
           <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
-            <Ltr as="span" className="font-bold text-sm shrink-0">
+            <Ltr as="span" className="font-extrabold text-lg tracking-tight shrink-0">
               #{order.order_number}
             </Ltr>
             <Badge
@@ -296,10 +296,20 @@ const KanbanOrderCard = memo(function KanbanOrderCard({
                 <span className="text-lg text-foreground font-medium flex-1 truncate">
                   {formatItemHeading(item.product_name, item.variant_selection)}
                 </span>
-                {item.addons && item.addons.length > 0 && (
-                  <span className="text-[10px] text-blue-600">+{item.addons.length}</span>
-                )}
               </div>
+              {item.addons && item.addons.length > 0 && (
+                <div className="ms-[26px] flex flex-wrap gap-1 mt-1">
+                  {item.addons.map((addon, i) => (
+                    <span
+                      key={`${addon.id ?? addon.name}-${i}`}
+                      className="text-[10px] bg-card/70 text-blue-600 px-1.5 py-0.5 rounded border border-blue-200"
+                    >
+                      + {addon.name}
+                      {(addon.quantity || 1) > 1 ? ` ×${addon.quantity}` : ''}
+                    </span>
+                  ))}
+                </div>
+              )}
               {item.special_instructions && (
                 <p className="ms-[26px] text-sm text-red-600 italic mt-0.5 font-medium break-words">
                   {`"${item.special_instructions}"`}
@@ -346,7 +356,7 @@ function VoidedColumn({
             className={`rounded-xl border-2 ${config.border} bg-card p-3 flex flex-col shadow-sm opacity-80`}
           >
             <div className="flex items-center gap-1.5 min-w-0 flex-wrap mb-2">
-              <Ltr as="span" className="font-bold text-sm shrink-0">
+              <Ltr as="span" className="font-extrabold text-lg tracking-tight shrink-0">
                 #{order.order_number}
               </Ltr>
               {order.table?.name && (
@@ -369,6 +379,24 @@ function VoidedColumn({
                       {formatItemHeading(item.product_name, item.variant_selection)}
                     </span>
                   </div>
+                  {item.addons && item.addons.length > 0 && (
+                    <div className="ms-[26px] flex flex-wrap gap-1 mt-1">
+                      {item.addons.map((addon, i) => (
+                        <span
+                          key={`${addon.id ?? addon.name}-${i}`}
+                          className="text-[10px] bg-card/70 text-blue-600 px-1.5 py-0.5 rounded border border-blue-200"
+                        >
+                          + {addon.name}
+                          {(addon.quantity || 1) > 1 ? ` ×${addon.quantity}` : ''}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {item.special_instructions && (
+                    <p className="ms-[26px] text-sm text-red-600 italic mt-0.5 font-medium break-words">
+                      {`"${item.special_instructions}"`}
+                    </p>
+                  )}
                 </button>
               ))}
             </div>
