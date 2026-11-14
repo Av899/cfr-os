@@ -1,4 +1,5 @@
 <div align="center">
+  <img src="assets/cfr-logo.png" alt="Coffee First Ritual (CFR) Logo" width="220" />
   <h1>☕ CFR OS (Coffee First Ritual)</h1>
   <p><strong>Artisanal Specialty Coffee & Viennoiserie Point-of-Sale & Operations Engine</strong></p>
   <p><em>Sector 12, Karnal, Haryana, India</em></p>
