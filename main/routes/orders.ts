@@ -2102,10 +2102,38 @@ router.post(
         notifyKdsUpdate();
         cloudSync.recordOrderChanged(result.order.id, 'order.created');
 
-        // Seam 011: CFR Gram-Level BOM & FEFO Inventory Deduction
+        // Seam 011: CFR Gram-Level BOM & FEFO Inventory Deduction & Grinder Burr Wear
         try {
           const { deductOrderBOM } = require('../cfr/inventory/bom');
-          deductOrderBOM(db, result.order.id, result.orderItems);
+          const bomResult = deductOrderBOM(db, result.order.id, result.orderItems);
+
+          // Calculate total coffee beans ground (in grams) for active grinder and bean lot
+          let totalCoffeeGrams = 0;
+          for (const ing of bomResult.ingredients) {
+            if (ing.ingredient_id.startsWith('ing_beans_')) {
+              totalCoffeeGrams += ing.total_qty;
+            }
+          }
+
+          if (totalCoffeeGrams > 0) {
+            try {
+              const { getPrimaryGrinder, recordGrindUsage } = require('../cfr/coffee/burr-wear');
+              const grinder = getPrimaryGrinder(db);
+              recordGrindUsage(db, grinder.id, totalCoffeeGrams);
+            } catch (grindErr) {
+              console.warn('[CFR Coffee] Grinder wear tracking error:', grindErr);
+            }
+
+            try {
+              const { getActiveBeanLot, deductBeanLotWeight } = require('../cfr/coffee/bean-lots');
+              const activeLot = getActiveBeanLot(db);
+              if (activeLot) {
+                deductBeanLotWeight(db, activeLot.id, totalCoffeeGrams);
+              }
+            } catch (lotErr) {
+              console.warn('[CFR Coffee] Bean lot weight deduction error:', lotErr);
+            }
+          }
         } catch (bomErr) {
           console.error('[CFR BOM] Stock deduction error:', bomErr);
         }

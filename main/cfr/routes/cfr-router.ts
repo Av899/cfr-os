@@ -33,6 +33,22 @@ import {
   seedStandardCfrRecipes,
 } from '../inventory/bom';
 import { CfrWasteReason } from '../types/inventory';
+import {
+  listBeanLots,
+  createBeanLot,
+  getActiveBeanLot,
+  setActiveBeanLot,
+} from '../coffee/bean-lots';
+import {
+  getPrimaryGrinder,
+  resetGrinderBurrs,
+} from '../coffee/burr-wear';
+import {
+  logDialIn,
+  getLatestDialIn,
+  listDialInHistory,
+  InvalidDialInParametersError,
+} from '../coffee/dial-in';
 
 export const cfrRouter = Router();
 
@@ -52,6 +68,8 @@ cfrRouter.get('/health', (req: Request, res: Response) => {
         count: number;
       }
     ).count;
+    const beanLotCount = (db.prepare('SELECT COUNT(*) as count FROM cfr_bean_lots').get() as { count: number }).count;
+    const dialInCount = (db.prepare('SELECT COUNT(*) as count FROM cfr_dial_in_logs').get() as { count: number }).count;
 
     res.json({
       status: 'ok',
@@ -67,6 +85,8 @@ cfrRouter.get('/health', (req: Request, res: Response) => {
         recipes: recipeCount,
         invoices: invoiceCount,
         pending_reconciliations: pendingPaymentCount,
+        bean_lots: beanLotCount,
+        dial_in_records: dialInCount,
       },
       timestamp: new Date().toISOString(),
     });
@@ -705,5 +725,236 @@ cfrRouter.get('/recipes', (req: Request, res: Response) => {
     res.status(500).json({ error: error?.message || 'Failed to fetch recipes' });
   }
 });
+
+/**
+ * ============================================================================
+ * WEEK 5: SPECIALTY COFFEE FRESHNESS, DIAL-IN & BURR WEAR ENDPOINTS
+ * ============================================================================
+ */
+
+/**
+ * GET /api/cfr/coffee/lots
+ * Lists all registered specialty coffee bean lots with real-time roast age and freshness metrics.
+ */
+cfrRouter.get('/coffee/lots', (req: Request, res: Response) => {
+  try {
+    const db = getDatabase();
+    const onlyActive = req.query.active_only === 'true';
+    const lots = listBeanLots(db, onlyActive);
+
+    res.json({
+      total: lots.length,
+      lots,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to fetch coffee bean lots' });
+  }
+});
+
+/**
+ * GET /api/cfr/coffee/lots/active
+ * Returns the currently mounted espresso hopper bean lot and its freshness window.
+ */
+cfrRouter.get('/coffee/lots/active', (req: Request, res: Response) => {
+  try {
+    const db = getDatabase();
+    const activeLot = getActiveBeanLot(db);
+
+    if (!activeLot) {
+      return res.status(404).json({ error: 'No active coffee bean lot currently mounted' });
+    }
+
+    res.json({
+      active_lot: activeLot,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to fetch active bean lot' });
+  }
+});
+
+/**
+ * POST /api/cfr/coffee/lots
+ * Registers a new specialty coffee bean lot from roaster.
+ */
+cfrRouter.post('/coffee/lots', (req: Request, res: Response) => {
+  try {
+    const { roaster_name, lot_name, origin, process, roast_date, weight_g, degas_days, peak_days, set_active } = req.body;
+
+    if (!roaster_name || !lot_name || !origin || !roast_date || weight_g === undefined || Number(weight_g) <= 0) {
+      return res.status(400).json({
+        error: 'Missing required lot fields (roaster_name, lot_name, origin, roast_date [YYYY-MM-DD], weight_g > 0)',
+      });
+    }
+
+    const db = getDatabase();
+    const lot = createBeanLot(db, {
+      roaster_name: String(roaster_name),
+      lot_name: String(lot_name),
+      origin: String(origin),
+      process: process ? String(process) : undefined,
+      roast_date: String(roast_date),
+      weight_g: Number(weight_g),
+      degas_days: degas_days ? Number(degas_days) : undefined,
+      peak_days: peak_days ? Number(peak_days) : undefined,
+      set_active: Boolean(set_active),
+    });
+
+    res.status(201).json({
+      message: `Coffee lot "${lot.lot_name}" registered successfully`,
+      lot,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to create coffee lot' });
+  }
+});
+
+/**
+ * PATCH /api/cfr/coffee/lots/:id/activate
+ * Sets a specific bean lot as the active espresso hopper lot.
+ */
+cfrRouter.patch('/coffee/lots/:id/activate', (req: Request, res: Response) => {
+  try {
+    const db = getDatabase();
+    const lotId = String(req.params.id);
+
+    setActiveBeanLot(db, lotId);
+
+    const activeLot = getActiveBeanLot(db);
+    res.json({
+      message: `Bean lot activated on primary grinder`,
+      active_lot: activeLot,
+    });
+  } catch (error: any) {
+    res.status(400).json({ error: error?.message || 'Failed to activate bean lot' });
+  }
+});
+
+/**
+ * GET /api/cfr/coffee/dial-in/latest
+ * Returns the most recent barista dial-in calibration record.
+ */
+cfrRouter.get('/coffee/dial-in/latest', (req: Request, res: Response) => {
+  try {
+    const db = getDatabase();
+    const beanLotId = req.query.bean_lot_id ? String(req.query.bean_lot_id) : undefined;
+    const latest = getLatestDialIn(db, beanLotId);
+
+    res.json({
+      latest,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to fetch latest dial-in log' });
+  }
+});
+
+/**
+ * POST /api/cfr/coffee/dial-in
+ * Logs a barista morning espresso calibration shot.
+ * Automatically deducts beans from FEFO inventory and accumulates grinder burr wear.
+ */
+cfrRouter.post('/coffee/dial-in', (req: Request, res: Response) => {
+  try {
+    const {
+      bean_lot_id,
+      dose_grams,
+      yield_grams,
+      time_seconds,
+      grind_setting,
+      waste_grams,
+      tasting_notes,
+      barista_name,
+    } = req.body;
+
+    if (dose_grams === undefined || yield_grams === undefined || time_seconds === undefined || !grind_setting) {
+      return res.status(400).json({
+        error: 'Missing required dial-in parameters (dose_grams, yield_grams, time_seconds, grind_setting)',
+      });
+    }
+
+    const db = getDatabase();
+    const record = logDialIn(db, {
+      bean_lot_id: bean_lot_id ? String(bean_lot_id) : undefined,
+      dose_grams: Number(dose_grams),
+      yield_grams: Number(yield_grams),
+      time_seconds: Number(time_seconds),
+      grind_setting: String(grind_setting),
+      waste_grams: waste_grams !== undefined ? Number(waste_grams) : undefined,
+      tasting_notes: tasting_notes ? String(tasting_notes) : undefined,
+      barista_name: barista_name ? String(barista_name) : undefined,
+    });
+
+    res.status(201).json({
+      message: 'Morning espresso dial-in logged successfully',
+      record,
+    });
+  } catch (error: any) {
+    if (error instanceof InvalidDialInParametersError) {
+      return res.status(400).json({ error: error.message });
+    }
+    res.status(500).json({ error: error?.message || 'Failed to log dial-in shot' });
+  }
+});
+
+/**
+ * GET /api/cfr/coffee/dial-in/history
+ * Returns historical dial-in calibration shots.
+ */
+cfrRouter.get('/coffee/dial-in/history', (req: Request, res: Response) => {
+  try {
+    const db = getDatabase();
+    const limit = req.query.limit ? Number(req.query.limit) : 50;
+    const history = listDialInHistory(db, limit);
+
+    res.json({
+      total: history.length,
+      history,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to fetch dial-in history' });
+  }
+});
+
+/**
+ * GET /api/cfr/coffee/grinder/wear
+ * Returns commercial grinder details and burr wear lifespan status.
+ */
+cfrRouter.get('/coffee/grinder/wear', (req: Request, res: Response) => {
+  try {
+    const db = getDatabase();
+    const grinderId = req.query.grinder_id ? String(req.query.grinder_id) : undefined;
+    const grinder = getPrimaryGrinder(db, grinderId);
+
+    res.json({
+      grinder,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to fetch grinder wear metrics' });
+  }
+});
+
+/**
+ * POST /api/cfr/coffee/grinder/reset
+ * Resets grinder cumulative wear counter to 0kg following burr replacement or sharpening.
+ */
+cfrRouter.post('/coffee/grinder/reset', (req: Request, res: Response) => {
+  try {
+    const db = getDatabase();
+    const { grinder_id } = req.body;
+
+    if (!grinder_id) {
+      return res.status(400).json({ error: 'grinder_id is required' });
+    }
+
+    const grinder = resetGrinderBurrs(db, String(grinder_id));
+
+    res.json({
+      message: `Burr counter reset to 0kg for ${grinder.name}`,
+      grinder,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to reset grinder burrs' });
+  }
+});
+
 
 

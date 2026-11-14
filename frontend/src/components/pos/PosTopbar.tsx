@@ -22,6 +22,7 @@ import {
 import type { Product } from '@/lib/types';
 import { useTranslations } from 'use-intl';
 import { useAuthStore } from '@/store/auth';
+import { BeanFreshnessPill } from '@/cfr/components/BeanFreshnessPill';
 
 interface Props {
   products: Product[];
@@ -98,6 +99,10 @@ export default function PosTopbar({
               </span>
             </button>
           )}
+
+          <div className="shrink-0">
+            <BeanFreshnessPill />
+          </div>
 
           <div className="shrink-0">
             <PrinterStatus />

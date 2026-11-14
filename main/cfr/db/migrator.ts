@@ -165,6 +165,19 @@ CREATE TABLE IF NOT EXISTS cfr_dial_in_logs (
   created_at TEXT NOT NULL
 );
 
+-- Commercial Espresso Grinders & Burr Lifespan Tracker
+CREATE TABLE IF NOT EXISTS cfr_grinders (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  model TEXT NOT NULL,
+  burr_type TEXT NOT NULL,
+  burr_capacity_kg REAL NOT NULL DEFAULT 500.0,
+  cumulative_ground_g REAL NOT NULL DEFAULT 0.0,
+  last_burr_replacement TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 -- UPI and Dual-Track Payment Reconciliations
 CREATE TABLE IF NOT EXISTS cfr_payments (
   id TEXT PRIMARY KEY,
@@ -339,6 +352,14 @@ export function runCfrMigrations(db: Database.Database): void {
     seedStandardCfrRecipes(db);
   } catch (err: any) {
     console.error('[CFR DB] Failed to seed recipes:', err?.message || err);
+  }
+
+  // 5. Seed standard CFR specialty coffee bean lots & grinder if empty
+  try {
+    const { seedStandardCoffeeSetup } = require('../coffee/bean-lots');
+    seedStandardCoffeeSetup(db);
+  } catch (err: any) {
+    console.error('[CFR DB] Failed to seed coffee setup:', err?.message || err);
   }
 
   console.log(`${logPrefix} CFR schema v${CFR_SCHEMA_VERSION} initialized successfully.`);
