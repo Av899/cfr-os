@@ -59,6 +59,9 @@ import { espressoAdapter } from '../adapters/espresso-adapter';
 import { pagerAdapter } from '../adapters/pager-adapter';
 import { ambienceAdapter } from '../adapters/ambience-adapter';
 import { CfrAmbienceScene } from '../types/menu-adapters';
+import { generateDailyZReport, formatZReportThermalReceipt } from '../reports/z-report';
+import { generateGstExportRows, generateGstCsvString } from '../reports/accountant-export';
+import { runSafeBackup, listBackups } from '../backup/sqlite-backup';
 
 export const cfrRouter = Router();
 
@@ -1254,6 +1257,136 @@ cfrRouter.post('/hardware/ambience/clear', (_req: Request, res: Response) => {
     res.status(500).json({ error: error?.message || 'Failed to clear ambience override' });
   }
 });
+
+/**
+ * ============================================================================
+ * WEEK 7: SHIFT BALANCING, DAILY Z-REPORT, GST EXPORT & DATABASE BACKUP
+ * ============================================================================
+ */
+
+/**
+ * GET /api/cfr/reports/z-report
+ * Generates the official Daily Z-Report with sales, GST split, COGS, and cash balancing.
+ */
+cfrRouter.get('/reports/z-report', (req: Request, res: Response) => {
+  try {
+    const db = getDatabase();
+    const date = req.query.date ? String(req.query.date) : undefined;
+    const openingFloat = req.query.opening_float_paise ? Number(req.query.opening_float_paise) : undefined;
+    const countedCash = req.query.actual_counted_cash_paise !== undefined
+      ? Number(req.query.actual_counted_cash_paise)
+      : null;
+
+    const report = generateDailyZReport(db, {
+      businessDate: date,
+      openingFloatPaise: openingFloat,
+      actualCountedCashPaise: countedCash,
+    });
+
+    res.json({ report });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to generate Z-Report' });
+  }
+});
+
+/**
+ * GET /api/cfr/reports/z-report/thermal
+ * Formats the daily Z-report as 80mm ESC/POS thermal text for printing.
+ */
+cfrRouter.get('/reports/z-report/thermal', (req: Request, res: Response) => {
+  try {
+    const db = getDatabase();
+    const date = req.query.date ? String(req.query.date) : undefined;
+    const openingFloat = req.query.opening_float_paise ? Number(req.query.opening_float_paise) : undefined;
+    const countedCash = req.query.actual_counted_cash_paise !== undefined
+      ? Number(req.query.actual_counted_cash_paise)
+      : null;
+
+    const report = generateDailyZReport(db, {
+      businessDate: date,
+      openingFloatPaise: openingFloat,
+      actualCountedCashPaise: countedCash,
+    });
+
+    const receiptText = formatZReportThermalReceipt(report);
+
+    res.json({
+      report_number: report.report_number,
+      receipt_text: receiptText,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to format thermal Z-Report' });
+  }
+});
+
+/**
+ * GET /api/cfr/reports/gst-export
+ * Generates Indian GSTR-1 compliant export (CSV attachment or JSON).
+ */
+cfrRouter.get('/reports/gst-export', (req: Request, res: Response) => {
+  try {
+    const db = getDatabase();
+    const startDate = req.query.start_date ? String(req.query.start_date) : undefined;
+    const endDate = req.query.end_date ? String(req.query.end_date) : undefined;
+    const format = req.query.format === 'csv' ? 'csv' : 'json';
+
+    const rows = generateGstExportRows(db, startDate, endDate);
+
+    if (format === 'csv') {
+      const csvContent = generateGstCsvString(rows);
+      const filenameDate = (startDate || 'ALL') + (endDate ? `_to_${endDate}` : '');
+      const filename = `CFR_GSTR1_EXPORT_${filenameDate}.csv`;
+
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      return res.send(csvContent);
+    }
+
+    res.json({
+      total_invoices: rows.length,
+      start_date: startDate || null,
+      end_date: endDate || null,
+      rows,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to export GST data' });
+  }
+});
+
+/**
+ * POST /api/cfr/backup/run
+ * Executes an atomic online SQLite VACUUM INTO backup with integrity verification.
+ */
+cfrRouter.post('/backup/run', (req: Request, res: Response) => {
+  try {
+    const db = getDatabase();
+    const backup = runSafeBackup(db);
+
+    res.status(201).json({
+      message: `Database snapshot "${backup.file_name}" created successfully`,
+      backup,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to create safe backup' });
+  }
+});
+
+/**
+ * GET /api/cfr/backup/list
+ * Lists available historical snapshots on disk.
+ */
+cfrRouter.get('/backup/list', (_req: Request, res: Response) => {
+  try {
+    const backups = listBackups();
+    res.json({
+      total: backups.length,
+      backups,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to list backups' });
+  }
+});
+
 
 
 

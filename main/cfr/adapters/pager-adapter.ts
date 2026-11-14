@@ -50,7 +50,9 @@ export class PagerAdapter {
       this.recentEvents.pop();
     }
 
-    console.log(`[CFR Pager] 📳 BUZZ DISPATCHED: "${message}" (Table: ${tableNum || 'Takeaway'}, Server: ${server || 'All'})`);
+    console.log(
+      `[CFR Pager] 📳 BUZZ DISPATCHED: "${message}" (Table: ${tableNum || 'Takeaway'}, Server: ${server || 'All'})`,
+    );
 
     return event;
   }
@@ -77,7 +79,8 @@ export class PagerAdapter {
       if (!order) return null;
 
       const orderRef = order.order_number || `#${order.id}`;
-      const destination = order.table_name || (order.dining_option === 'takeaway' ? 'Takeaway Counter' : 'Pass');
+      const destination =
+        order.table_name || (order.dining_option === 'takeaway' ? 'Takeaway Counter' : 'Pass');
       const message = `Order ${orderRef} is READY for ${destination}`;
 
       return this.buzzPager(db, {

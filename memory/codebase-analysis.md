@@ -1,9 +1,11 @@
 # Codebase Analysis: FloCafe Senior Frontend + Backend + Fullstack
 
 ## Project Overview
+
 FloCafe is an **open-source, offline-first Electron desktop POS** system for cafes and restaurants. The architecture follows a clear client-server model with Electron as the desktop wrapper.
 
 ### Stack
+
 - **Frontend**: Next.js 16, React 19, Zustand state, shadcn/ui components, Tailwind CSS
 - **Backend**: Node.js + Express on port `:3001`, SQLite via `better-sqlite3`
 - **KDS**: Standalone server on `:3002`, WebSocket + REST polling
@@ -24,6 +26,7 @@ FloCafe is an **open-source, offline-first Electron desktop POS** system for caf
 ## Frontend Analysis
 
 ### Key Files & Structure
+
 - `frontend/src/components/kds/` - KDS workspace, kanban/tab views, login form
 - `frontend/src/hooks/useKdsConnection.ts` - WebSocket + REST polling connection management
 - `frontend/src/hooks/useKdsView.ts` - View mode (tabs/kanban) stored in localStorage
@@ -32,18 +35,21 @@ FloCafe is an **open-source, offline-first Electron desktop POS** system for caf
 - `frontend/src/lib/api.ts` - API client (Axios instance pointing to `:3001`)
 
 ### KDS Connection Flow
+
 1. **WebSocket first**: Connect to `ws://localhost:<port>/kds` with auth token
 2. **REST fallback**: Poll `/kitchen/orders?status=pending,preparing,ready,served` every 5s
 3. **Auth flow**: Login → `/auth/me` → WebSocket login with token
 4. **View mode**: Session override > server default > 'tabs' fallback, stored in localStorage
 
 ### Authorization
+
 - API routes protected by `requireAuth` middleware (JWT Bearer token)
 - Role-based permissions via `requirePermission` middleware
 - Administrative permissions: `authorization.manage`, `staff.privileged.manage`, `staff.operational.manage`, `settings.manage`
 - **Critical**: No `order.user_id !== user.userId` checks — orders are visibility-gated by role only
 
 ### CFR (Cafe/Free Restaurant) Features
+
 - **Week 1**: 100% Vegetarian & Artisanal Eggless Dietary Policy (Strict zero-tolerance guard, SQLite CHECK constraints, flags).
 - **Week 2**: Haryana 5% GST (2.5% CGST + 2.5% SGST) + Roundoff, Strict ₹10 Price Increments, Gap-Free Sequential Invoicing (`CFR-2627-XXXXXX`).
 - **Week 3**: Dynamic UPI QR Generator & Dual-Track Offline/Online Reconciler (12-digit Indian Bank UTR validation).
@@ -54,6 +60,7 @@ FloCafe is an **open-source, offline-first Electron desktop POS** system for caf
 ## Backend Analysis
 
 ### Key Files & Structure
+
 - `main/index.ts` - Electron lifecycle, Express API, KDS, Server App initialization
 - `main/server.ts` - Express server with CORS, CSP, auth middleware, static serving
 - `main/routes/orders.ts` - Full order CRUD (6000+ lines)
@@ -62,17 +69,20 @@ FloCafe is an **open-source, offline-first Electron desktop POS** system for caf
 - `main/middleware/security.ts` - Auth middleware with token revocation/stale detection
 
 ### Authorization System
+
 ```
 JWT Token → requireAuth middleware → resolveEffectivePermissions() → hasPermission() → route guard
 ```
 
 Key permission concepts:
+
 - **Role defaults**: Shipped-in permissions per role (e.g., chef can manage KDS, owner can manage staff)
 - **Role overrides**: Per-role permission modifications in DB
 - **User overrides**: Per-user permission modifications in DB
 - **Protected rules**: `authorization.manage` and `staff.privileged.manage` only allow `role === 'owner'`
 
 ### Order Creation Flow
+
 1. Validation → Item resolution (variants, add-ons, inventory deduction)
 2. Tax calculation (backend-authoritative)
 3. Stock deduction (inventory service)
@@ -83,12 +93,14 @@ Key permission concepts:
 **Critical invariant**: Orders use `authenticatedUserId` (from JWT), not `order.user_id` for visibility. Any staff with `orders.read` permission can view any order.
 
 ### Kitchen Stations
+
 - Managed via `requirePermission('kitchen.stations.manage')`
 - Categories assigned per station
 - Staff assigned per station (only active chef accounts)
 - DELETE requires no assigned tables
 
 ### Tax & Compliance
+
 - Tax engine calculates taxes per order
 - Country packs for tax rules
 - Tax packs can be updated remotely (Google Drive integration)
@@ -97,6 +109,7 @@ Key permission concepts:
 ## Fullstack Integration Points
 
 ### 1. Order → KDS Pipeline
+
 ```
 Order creation (POST /api/orders)
   → notifyKdsUpdate() → WebSocket broadcast to /kds
@@ -106,6 +119,7 @@ Order creation (POST /api/orders)
 ```
 
 ### 2. CFR → Order Pipeline
+
 ```
 Order creation (POST /api/orders)
   → resolveItemAddons() → addon validation
@@ -115,6 +129,7 @@ Order creation (POST /api/orders)
 ```
 
 ### 3. Permissions → Feature Gating
+
 ```
 Role-based permissions control:
   - KDS access (kitchen.stations.manage)
@@ -126,18 +141,21 @@ Role-based permissions control:
 ## Skills Analysis Summary
 
 ### Senior Frontend
+
 - **Proficient**: Next.js 16 + React 19, shadcn/ui, Tailwind CSS, Zustand
 - **Experienced**: WebSocket connections, REST polling, form state, accessibility (aria-live, focus-visible)
 - **Knowledgeable**: KDS connection flow (WS + REST fallback), view mode persistence, CFR inventory UI
 - **Needs verification**: Browser checker output, screen reader testing, keyboard navigation paths
 
 ### Senior Backend
+
 - **Proficient**: Express + TypeScript, SQLite via better-sqlite3, JWT auth
 - **Experienced**: Permission resolution systems, tax calculation engines, offline-first data safety
 - **Knowledgeable**: Role-based permissions without ownership-gating, mDNS/Bonjour discovery, KDS WS protocol
 - **Needs verification**: Permission override edge cases, tax pack update conflict resolution
 
 ### Senior Fullstack
+
 - **Proficient**: Electron + Next.js desktop export boundary, API route patterns, IPC handlers
 - **Experienced**: Offline-first state management, authorization without ownership-gating, multi-port daemon coordination
 - **Knowledgeable**: End-to-end flows (order → KDS → printing), CFR inventory integration, permission system architecture
@@ -157,6 +175,7 @@ Role-based permissions control:
 ## Recommendations
 
 ### For Frontend Development
+
 1. Reuse existing components (Button, Input, etc.) from project's component library
 2. Handle all states: loading, empty, error, success, pending action, long/odd content, partial failure
 3. Design at 375px wide first, then widen; never horizontal scroll
@@ -167,6 +186,7 @@ Role-based permissions control:
 8. One `<h1>` per page, headings in order
 
 ### For Backend Development
+
 1. Maintain backend authority on tax, payment, and security calculations
 2. Never add `role === 'server' && order.user_id !== user.userId`-style checks
 3. Keep authorization role/action-based, not creator-based
@@ -175,6 +195,7 @@ Role-based permissions control:
 6. Handle offline mode gracefully; optional features fail when offline
 
 ### For Fullstack Integration
+
 1. Wire every new test suite into `package.json` test scripts
 2. Clear ports with `npm run clean` before dev/test commands
 3. Run `npm run docs:check` after doc changes
@@ -184,6 +205,7 @@ Role-based permissions control:
 7. Verify every behavioral claim against current code/tests before documenting
 
 ## Files to Reference
+
 - `docs/reference/product-invariants.md` - Product boundary definitions
 - `docs/reference/roles-and-permissions.md` - Role/permission details
 - `docs/architecture/` - System architecture documents

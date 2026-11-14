@@ -23,6 +23,7 @@ import {
   Monitor,
   Boxes,
   Receipt,
+  FileSpreadsheet,
   Lock,
   Sparkles,
   type LucideIcon,
@@ -113,6 +114,13 @@ const ALL_NAV_ITEMS: NavItem[] = [
     labelKey: 'expenses',
     icon: Receipt,
     permission: 'expenses.view',
+    businessTypes: null,
+  },
+  {
+    href: '/reports',
+    labelKey: 'reports',
+    icon: FileSpreadsheet,
+    permission: 'dashboard.view',
     businessTypes: null,
   },
   {
