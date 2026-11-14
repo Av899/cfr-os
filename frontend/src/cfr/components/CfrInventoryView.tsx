@@ -6,18 +6,12 @@ import {
   Plus,
   RefreshCw,
   Search,
-  AlertTriangle,
   Calendar,
-  Layers,
   ChefHat,
   History,
-  CheckCircle2,
-  Trash2,
   Coffee,
   PackageMinus,
   Sparkles,
-  ArrowRight,
-  ShieldAlert,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -82,6 +76,9 @@ export function CfrInventoryView() {
   const [movements, setMovements] = useState<StockMovement[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  
   // Receive Stock Lot Modal State
   const [showReceiveModal, setShowReceiveModal] = useState(false);
   const [selectedIngredientId, setSelectedIngredientId] = useState('');
@@ -99,45 +96,45 @@ export function CfrInventoryView() {
   const [wasteReason, setWasteReason] = useState<string>('DIAL_IN_SHOT');
   const [submittingWaste, setSubmittingWaste] = useState(false);
 
-  const fetchStock = useCallback(async () => {
-    try {
-      setLoading(true);
-      const res = await api.get('/cfr/inventory/stock');
-      setIngredients(res.data?.stock || []);
-    } catch (err: unknown) {
-      const errorMsg =
-        err instanceof Error ? err.message : typeof err === 'object' && err && 'response' in err ? (err as { response?: { data?: { error?: string } } }).response?.data?.error || 'Unknown error' : 'Unknown error';
-      toast.error('Failed to load CFR stock: ' + errorMsg);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const fetchRecipes = useCallback(async () => {
-    try {
-      const res = await api.get('/cfr/recipes');
-      setRecipes(res.data?.recipes || []);
-    } catch (err: unknown) {
-      const errorMsg =
-        err instanceof Error ? err.message : typeof err === 'object' && err && 'response' in err ? (err as { response?: { data?: { error?: string } } }).response?.data?.error || 'Unknown error' : 'Unknown error';
-      toast.error('Failed to load recipes: ' + errorMsg);
-    }
-  }, []);
-
-  const fetchMovements = useCallback(async () => {
-    try {
-      const res = await api.get('/cfr/inventory/movements?limit=50');
-      setMovements(res.data?.movements || []);
-    } catch (err: unknown) {
-      console.warn('Failed to load movements:', err);
-    }
-  }, []);
-
   useEffect(() => {
-    fetchStock();
-    fetchRecipes();
-    fetchMovements();
-  }, [fetchStock, fetchRecipes, fetchMovements]);
+    let active = true;
+    Promise.all([
+      api.get('/cfr/inventory/stock'),
+      api.get('/cfr/recipes'),
+      api.get('/cfr/inventory/movements?limit=50'),
+    ])
+      .then(([stockRes, recipesRes, movementsRes]) => {
+        if (!active) return;
+        setIngredients(stockRes.data?.stock || []);
+        setRecipes(recipesRes.data?.recipes || []);
+        setMovements(movementsRes.data?.movements || []);
+      })
+      .catch((err: unknown) => {
+        if (!active) return;
+        const errorMsg =
+          err instanceof Error
+            ? err.message
+            : typeof err === 'object' && err && 'response' in err
+              ? (err as { response?: { data?: { error?: string } } }).response?.data?.error || 'Unknown error'
+              : 'Unknown error';
+        toast.error('Failed to load CFR inventory: ' + errorMsg);
+      })
+      .finally(() => {
+        if (active) {
+          setLoading(false);
+          setIsRefreshing(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [refreshKey]);
+
+  const handleRefresh = useCallback(() => {
+    setIsRefreshing(true);
+    setRefreshKey((k) => k + 1);
+  }, []);
 
   const handleReceiveStock = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -165,8 +162,7 @@ export function CfrInventoryView() {
       setExpiryDate('');
       setInitialQty('');
       setUnitCostPaise('');
-      await fetchStock();
-      await fetchMovements();
+      setRefreshKey((k) => k + 1);
     } catch (err: unknown) {
       const errorMsg =
         err instanceof Error ? err.message : typeof err === 'object' && err && 'response' in err ? (err as { response?: { data?: { error?: string } } }).response?.data?.error || 'Unknown error' : 'Unknown error';
@@ -194,8 +190,7 @@ export function CfrInventoryView() {
       toast.success('Zero-revenue barista waste recorded & FEFO stock deducted.');
       setShowWasteModal(false);
       setWasteQty('');
-      await fetchStock();
-      await fetchMovements();
+      setRefreshKey((k) => k + 1);
     } catch (err: unknown) {
       const errorMsg =
         err instanceof Error ? err.message : typeof err === 'object' && err && 'response' in err ? (err as { response?: { data?: { error?: string } } }).response?.data?.error || 'Unknown error' : 'Unknown error';
@@ -236,14 +231,10 @@ export function CfrInventoryView() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => {
-              fetchStock();
-              fetchRecipes();
-              fetchMovements();
-            }}
+            onClick={handleRefresh}
             className="h-9 px-3 text-xs"
           >
-            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isRefreshing ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
 
@@ -326,214 +317,224 @@ export function CfrInventoryView() {
         </div>
       </div>
 
-      {/* Tab 1: FEFO Stock */}
-      {activeTab === 'stock' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredIngredients.map((ing) => {
-            const pct = ing.par_level > 0 ? Math.min(100, Math.round((ing.current_stock / ing.par_level) * 100)) : 100;
-            return (
-              <div
-                key={ing.id}
-                className="bg-card border border-border rounded-xl p-4 shadow-xs flex flex-col justify-between hover:border-[#8B5E3C]/40 transition-colors"
-              >
-                <div>
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <span className="text-[10px] uppercase font-bold tracking-wider text-[#8B5E3C] bg-[#8B5E3C]/10 px-2 py-0.5 rounded-sm">
-                        {ing.category.replace('_', ' ')}
-                      </span>
-                      <h3 className="font-semibold text-sm text-foreground mt-1.5 line-clamp-1">
-                        {ing.name}
-                      </h3>
-                    </div>
-                    {ing.is_low_stock ? (
-                      <Badge variant="destructive" className="text-[10px] shrink-0">
-                        Low Stock
-                      </Badge>
-                    ) : (
-                      <Badge variant="secondary" className="text-[10px] shrink-0 text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-400">
-                        In Stock
-                      </Badge>
-                    )}
-                  </div>
-
-                  {/* Stock Bar */}
-                  <div className="mt-4 space-y-1.5">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">Available Stock:</span>
-                      <span className="font-bold text-foreground">
-                        {ing.current_stock.toLocaleString()} {ing.base_unit}
-                      </span>
-                    </div>
-                    <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all ${
-                          ing.is_low_stock ? 'bg-rose-500' : 'bg-[#8B5E3C]'
-                        }`}
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                      <span>Par Level: {ing.par_level.toLocaleString()} {ing.base_unit}</span>
-                      <span>{pct}% filled</span>
-                    </div>
-                  </div>
-
-                  {/* Expiry Details */}
-                  <div className="mt-4 pt-3 border-t border-border flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground flex items-center gap-1">
-                      <Calendar className="w-3.5 h-3.5" /> Earliest Expiry:
-                    </span>
-                    <span className={ing.earliest_expiry ? 'font-medium text-foreground' : 'text-muted-foreground italic'}>
-                      {ing.earliest_expiry || 'No active lots'}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="mt-4 pt-2 flex items-center justify-between gap-2">
-                  <span className="text-[11px] text-muted-foreground">
-                    Active lots: <strong className="text-foreground">{ing.active_lots_count}</strong>
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setSelectedIngredientId(ing.id);
-                      setShowReceiveModal(true);
-                    }}
-                    className="h-7 text-[11px] px-2.5"
-                  >
-                    + Add Batch
-                  </Button>
-                </div>
-              </div>
-            );
-          })}
+      {/* Content or Loading */}
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-20 gap-3 text-muted-foreground">
+          <RefreshCw className="w-6 h-6 animate-spin text-[#8B5E3C]" />
+          <p className="text-xs">Loading CFR inventory & recipes...</p>
         </div>
-      )}
+      ) : (
+        <>
+          {/* Tab 1: FEFO Stock */}
+          {activeTab === 'stock' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredIngredients.map((ing) => {
+                const pct = ing.par_level > 0 ? Math.min(100, Math.round((ing.current_stock / ing.par_level) * 100)) : 100;
+                return (
+                  <div
+                    key={ing.id}
+                    className="bg-card border border-border rounded-xl p-4 shadow-xs flex flex-col justify-between hover:border-[#8B5E3C]/40 transition-colors"
+                  >
+                    <div>
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <span className="text-[10px] uppercase font-bold tracking-wider text-[#8B5E3C] bg-[#8B5E3C]/10 px-2 py-0.5 rounded-sm">
+                            {ing.category.replace('_', ' ')}
+                          </span>
+                          <h3 className="font-semibold text-sm text-foreground mt-1.5 line-clamp-1">
+                            {ing.name}
+                          </h3>
+                        </div>
+                        {ing.is_low_stock ? (
+                          <Badge variant="destructive" className="text-[10px] shrink-0">
+                            Low Stock
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-[10px] shrink-0 text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-400">
+                            In Stock
+                          </Badge>
+                        )}
+                      </div>
 
-      {/* Tab 2: Gram-Level Recipes */}
-      {activeTab === 'recipes' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filteredRecipes.map((recipe) => (
-            <div
-              key={recipe.id}
-              className="bg-card border border-border rounded-xl p-5 shadow-xs flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex items-center justify-between gap-2 mb-3">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-sm text-foreground">{recipe.name}</h3>
-                    {recipe.is_sub_recipe === 1 && (
-                      <span className="text-[10px] bg-purple-100 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded-full font-medium">
-                        Sub-Recipe
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-xs text-muted-foreground">
-                    Yield: <strong>{recipe.yield_quantity} {recipe.yield_unit}</strong>
-                  </span>
-                </div>
+                      {/* Stock Bar */}
+                      <div className="mt-4 space-y-1.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">Available Stock:</span>
+                          <span className="font-bold text-foreground">
+                            {ing.current_stock.toLocaleString()} {ing.base_unit}
+                          </span>
+                        </div>
+                        <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${
+                              ing.is_low_stock ? 'bg-rose-500' : 'bg-[#8B5E3C]'
+                            }`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                          <span>Par Level: {ing.par_level.toLocaleString()} {ing.base_unit}</span>
+                          <span>{pct}% filled</span>
+                        </div>
+                      </div>
 
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                  Bill of Materials (BOM):
-                </p>
-
-                <div className="space-y-1.5 bg-muted/40 p-3 rounded-lg border border-border/60">
-                  {recipe.items && recipe.items.length > 0 ? (
-                    recipe.items.map((item, idx) => (
-                      <div key={idx} className="flex items-center justify-between text-xs py-1 border-b border-border/40 last:border-b-0">
-                        <span className="text-foreground flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#8B5E3C]" />
-                          {item.ingredient_name || item.sub_recipe_name}
+                      {/* Expiry Details */}
+                      <div className="mt-4 pt-3 border-t border-border flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground flex items-center gap-1">
+                          <Calendar className="w-3.5 h-3.5" /> Earliest Expiry:
                         </span>
-                        <span className="font-mono font-medium text-foreground">
-                          {item.quantity} {item.unit}
+                        <span className={ing.earliest_expiry ? 'font-medium text-foreground' : 'text-muted-foreground italic'}>
+                          {ing.earliest_expiry || 'No active lots'}
                         </span>
                       </div>
-                    ))
-                  ) : (
-                    <p className="text-xs text-muted-foreground italic">No line items configured.</p>
-                  )}
-                </div>
-              </div>
+                    </div>
 
-              <div className="mt-4 pt-3 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
-                <span className="flex items-center gap-1 text-[#8B5E3C]">
-                  <Sparkles className="w-3.5 h-3.5" /> Auto-deducted on order placement
-                </span>
+                    <div className="mt-4 pt-2 flex items-center justify-between gap-2">
+                      <span className="text-[11px] text-muted-foreground">
+                        Active lots: <strong className="text-foreground">{ing.active_lots_count}</strong>
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedIngredientId(ing.id);
+                          setShowReceiveModal(true);
+                        }}
+                        className="h-7 text-[11px] px-2.5"
+                      >
+                        + Add Batch
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Tab 2: Gram-Level Recipes */}
+          {activeTab === 'recipes' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredRecipes.map((recipe) => (
+                <div
+                  key={recipe.id}
+                  className="bg-card border border-border rounded-xl p-5 shadow-xs flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-sm text-foreground">{recipe.name}</h3>
+                        {recipe.is_sub_recipe === 1 && (
+                          <span className="text-[10px] bg-purple-100 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded-full font-medium">
+                            Sub-Recipe
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        Yield: <strong>{recipe.yield_quantity} {recipe.yield_unit}</strong>
+                      </span>
+                    </div>
+
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                      Bill of Materials (BOM):
+                    </p>
+
+                    <div className="space-y-1.5 bg-muted/40 p-3 rounded-lg border border-border/60">
+                      {recipe.items && recipe.items.length > 0 ? (
+                        recipe.items.map((item, idx) => (
+                          <div key={idx} className="flex items-center justify-between text-xs py-1 border-b border-border/40 last:border-b-0">
+                            <span className="text-foreground flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-[#8B5E3C]" />
+                              {item.ingredient_name || item.sub_recipe_name}
+                            </span>
+                            <span className="font-mono font-medium text-foreground">
+                              {item.quantity} {item.unit}
+                            </span>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-xs text-muted-foreground italic">No line items configured.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1 text-[#8B5E3C]">
+                      <Sparkles className="w-3.5 h-3.5" /> Auto-deducted on order placement
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Tab 3: Stock Movement Ledger */}
+          {activeTab === 'movements' && (
+            <div className="bg-card border border-border rounded-xl overflow-hidden shadow-xs">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-muted text-muted-foreground uppercase font-semibold text-[10px] tracking-wider border-b border-border">
+                    <tr>
+                      <th className="py-3 px-4">Timestamp</th>
+                      <th className="py-3 px-4">Ingredient</th>
+                      <th className="py-3 px-4">Type</th>
+                      <th className="py-3 px-4">Delta Qty</th>
+                      <th className="py-3 px-4">Reason / Order #</th>
+                      <th className="py-3 px-4">Batch Lot</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {movements.length > 0 ? (
+                      movements.map((m) => (
+                        <tr key={m.id} className="hover:bg-muted/40 transition-colors">
+                          <td className="py-2.5 px-4 text-muted-foreground font-mono text-[11px]">
+                            {new Date(m.created_at).toLocaleString()}
+                          </td>
+                          <td className="py-2.5 px-4 font-medium text-foreground">
+                            {m.ingredient_name}
+                          </td>
+                          <td className="py-2.5 px-4">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                                m.type === 'PURCHASE'
+                                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400'
+                                  : m.type === 'DEDUCTION_ORDER'
+                                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400'
+                                  : m.type === 'WASTE'
+                                  ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400'
+                                  : 'bg-muted text-foreground'
+                              }`}
+                            >
+                              {m.type}
+                            </span>
+                          </td>
+                          <td
+                            className={`py-2.5 px-4 font-mono font-medium ${
+                              m.qty < 0 ? 'text-rose-600' : 'text-emerald-600'
+                            }`}
+                          >
+                            {m.qty > 0 ? `+${m.qty}` : m.qty} {m.unit}
+                          </td>
+                          <td className="py-2.5 px-4 text-muted-foreground">
+                            {m.order_id ? `Order #${m.order_id.slice(-6)}` : m.reason || '—'}
+                          </td>
+                          <td className="py-2.5 px-4 font-mono text-[11px] text-muted-foreground">
+                            {m.lot_batch_no || '—'}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={6} className="text-center py-8 text-muted-foreground">
+                          No stock movements recorded yet. Receive a batch or place an order to see live audit logs.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
-          ))}
-        </div>
-      )}
-
-      {/* Tab 3: Stock Movement Ledger */}
-      {activeTab === 'movements' && (
-        <div className="bg-card border border-border rounded-xl overflow-hidden shadow-xs">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-muted text-muted-foreground uppercase font-semibold text-[10px] tracking-wider border-b border-border">
-                <tr>
-                  <th className="py-3 px-4">Timestamp</th>
-                  <th className="py-3 px-4">Ingredient</th>
-                  <th className="py-3 px-4">Type</th>
-                  <th className="py-3 px-4">Delta Qty</th>
-                  <th className="py-3 px-4">Reason / Order #</th>
-                  <th className="py-3 px-4">Batch Lot</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {movements.length > 0 ? (
-                  movements.map((m) => (
-                    <tr key={m.id} className="hover:bg-muted/40 transition-colors">
-                      <td className="py-2.5 px-4 text-muted-foreground font-mono text-[11px]">
-                        {new Date(m.created_at).toLocaleString()}
-                      </td>
-                      <td className="py-2.5 px-4 font-medium text-foreground">
-                        {m.ingredient_name}
-                      </td>
-                      <td className="py-2.5 px-4">
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                            m.type === 'PURCHASE'
-                              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400'
-                              : m.type === 'DEDUCTION_ORDER'
-                              ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400'
-                              : m.type === 'WASTE'
-                              ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400'
-                              : 'bg-muted text-foreground'
-                          }`}
-                        >
-                          {m.type}
-                        </span>
-                      </td>
-                      <td
-                        className={`py-2.5 px-4 font-mono font-medium ${
-                          m.qty < 0 ? 'text-rose-600' : 'text-emerald-600'
-                        }`}
-                      >
-                        {m.qty > 0 ? `+${m.qty}` : m.qty} {m.unit}
-                      </td>
-                      <td className="py-2.5 px-4 text-muted-foreground">
-                        {m.order_id ? `Order #${m.order_id.slice(-6)}` : m.reason || '—'}
-                      </td>
-                      <td className="py-2.5 px-4 font-mono text-[11px] text-muted-foreground">
-                        {m.lot_batch_no || '—'}
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={6} className="text-center py-8 text-muted-foreground">
-                      No stock movements recorded yet. Receive a batch or place an order to see live audit logs.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+          )}
+        </>
       )}
 
       {/* Modal: Receive Stock Lot (FEFO) */}
