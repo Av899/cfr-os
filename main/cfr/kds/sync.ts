@@ -68,6 +68,14 @@ export function syncParentOrderStatus(db: any, orderId: number | string): Synced
          SET status = 'ready', ready_at = COALESCE(ready_at, ?), updated_at = ?
          WHERE id = ? AND status NOT IN ('completed', 'cancelled')`,
       ).run(timestamp, timestamp, orderId);
+
+      // CFR Hardware Adapter: Buzz server wrist pagers when order is ready
+      try {
+        const { pagerAdapter } = require('../adapters/pager-adapter');
+        pagerAdapter.triggerOrderReadyPager(db, orderId);
+      } catch (pagerErr) {
+        console.warn('[CFR Pager] Failed to auto-buzz server pager:', pagerErr);
+      }
     } else if (nextStatus === 'preparing') {
       db.prepare(
         `UPDATE orders

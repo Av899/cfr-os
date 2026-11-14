@@ -49,6 +49,16 @@ import {
   listDialInHistory,
   InvalidDialInParametersError,
 } from '../coffee/dial-in';
+import {
+  getPublicDigitalMenu,
+  getMenuItemById,
+  setMenuItemAvailability,
+} from '../menu/menu-engine';
+import { ovenAdapter } from '../adapters/oven-adapter';
+import { espressoAdapter } from '../adapters/espresso-adapter';
+import { pagerAdapter } from '../adapters/pager-adapter';
+import { ambienceAdapter } from '../adapters/ambience-adapter';
+import { CfrAmbienceScene } from '../types/menu-adapters';
 
 export const cfrRouter = Router();
 
@@ -70,6 +80,7 @@ cfrRouter.get('/health', (req: Request, res: Response) => {
     ).count;
     const beanLotCount = (db.prepare('SELECT COUNT(*) as count FROM cfr_bean_lots').get() as { count: number }).count;
     const dialInCount = (db.prepare('SELECT COUNT(*) as count FROM cfr_dial_in_logs').get() as { count: number }).count;
+    const menuItemCount = (db.prepare('SELECT COUNT(*) as count FROM cfr_menu_items').get() as { count: number }).count;
 
     res.json({
       status: 'ok',
@@ -87,6 +98,7 @@ cfrRouter.get('/health', (req: Request, res: Response) => {
         pending_reconciliations: pendingPaymentCount,
         bean_lots: beanLotCount,
         dial_in_records: dialInCount,
+        menu_items: menuItemCount,
       },
       timestamp: new Date().toISOString(),
     });
@@ -955,6 +967,294 @@ cfrRouter.post('/coffee/grinder/reset', (req: Request, res: Response) => {
     res.status(500).json({ error: error?.message || 'Failed to reset grinder burrs' });
   }
 });
+
+/**
+ * ============================================================================
+ * WEEK 6: LUXURY DIGITAL GUEST MENU & HARDWARE ADAPTER ENDPOINTS
+ * ============================================================================
+ */
+
+/**
+ * GET /api/cfr/menu
+ * Returns the public guest digital menu with the 7 signature sections,
+ * tasting notes, craft stories, ₹10 prices, and real-time availability.
+ */
+cfrRouter.get('/menu', (req: Request, res: Response) => {
+  try {
+    const db = getDatabase();
+    const includeUnavailable = req.query.include_unavailable !== 'false';
+    const menu = getPublicDigitalMenu(db, includeUnavailable);
+
+    res.json(menu);
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to load public digital menu' });
+  }
+});
+
+/**
+ * GET /api/cfr/menu/item/:id
+ * Returns single menu item with full terroir and craft story.
+ */
+cfrRouter.get('/menu/item/:id', (req: Request, res: Response) => {
+  try {
+    const db = getDatabase();
+    const item = getMenuItemById(db, String(req.params.id));
+
+    if (!item) {
+      return res.status(404).json({ error: `Menu item "${req.params.id}" not found` });
+    }
+
+    res.json({ item });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to load menu item' });
+  }
+});
+
+/**
+ * PATCH /api/cfr/menu/item/:id/availability
+ * Toggles an item's real-time 86'd / sold-out availability on the guest digital menu.
+ */
+cfrRouter.patch('/menu/item/:id/availability', (req: Request, res: Response) => {
+  try {
+    const db = getDatabase();
+    const { is_available } = req.body;
+
+    if (is_available === undefined) {
+      return res.status(400).json({ error: 'is_available boolean is required' });
+    }
+
+    const updated = setMenuItemAvailability(db, String(req.params.id), Boolean(is_available));
+
+    res.json({
+      message: `Menu item "${updated.name}" is now ${updated.is_available ? 'AVAILABLE' : '86\'D (SOLD OUT)'}`,
+      item: updated,
+    });
+  } catch (error: any) {
+    res.status(400).json({ error: error?.message || 'Failed to update item availability' });
+  }
+});
+
+/**
+ * GET /api/cfr/equipment/checklists
+ * Returns all commercial equipment maintenance tasks (Oven, Espresso, Grinder).
+ */
+cfrRouter.get('/equipment/checklists', (req: Request, res: Response) => {
+  try {
+    const db = getDatabase();
+    const type = req.query.type ? String(req.query.type).toUpperCase() : undefined;
+
+    let query = 'SELECT * FROM cfr_equipment_tasks';
+    const params: unknown[] = [];
+    if (type) {
+      query += ' WHERE equipment_type = ?';
+      params.push(type);
+    }
+    query += ' ORDER BY frequency, task_name';
+
+    const tasks = db.prepare(query).all(...params) as any[];
+
+    res.json({
+      total: tasks.length,
+      tasks: tasks.map((t) => ({ ...t, is_completed: t.is_completed === 1 })),
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to fetch equipment checklists' });
+  }
+});
+
+/**
+ * POST /api/cfr/equipment/checklists/:id/complete
+ * Marks a commercial equipment cleaning or maintenance task as completed.
+ */
+cfrRouter.post('/equipment/checklists/:id/complete', (req: Request, res: Response) => {
+  try {
+    const db = getDatabase();
+    const taskId = String(req.params.id);
+    const { completed_by = 'Staff Member' } = req.body;
+    const now = new Date().toISOString();
+
+    const result = db.prepare(`
+      UPDATE cfr_equipment_tasks
+      SET is_completed = 1,
+          last_completed_at = ?,
+          completed_by = ?
+      WHERE id = ?
+    `).run(now, completed_by, taskId);
+
+    if (result.changes === 0) {
+      return res.status(404).json({ error: `Task "${taskId}" not found` });
+    }
+
+    const task = db.prepare('SELECT * FROM cfr_equipment_tasks WHERE id = ?').get(taskId) as any;
+
+    res.json({
+      message: `Task "${task.task_name}" marked completed`,
+      task: { ...task, is_completed: task.is_completed === 1 },
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to complete task' });
+  }
+});
+
+/**
+ * GET /api/cfr/hardware/oven/status
+ * Returns Unox Bakertop Combi oven status, actual vs target temperature, and active program.
+ */
+cfrRouter.get('/hardware/oven/status', (_req: Request, res: Response) => {
+  try {
+    const status = ovenAdapter.getStatus();
+    res.json({ oven: status });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to fetch oven status' });
+  }
+});
+
+/**
+ * GET /api/cfr/hardware/oven/programs
+ * Lists available Unox Combi baking programs.
+ */
+cfrRouter.get('/hardware/oven/programs', (_req: Request, res: Response) => {
+  try {
+    const programs = ovenAdapter.listPrograms();
+    res.json({ programs });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to list oven programs' });
+  }
+});
+
+/**
+ * POST /api/cfr/hardware/oven/program
+ * Sets active baking program and target preheat temperature.
+ */
+cfrRouter.post('/hardware/oven/program', (req: Request, res: Response) => {
+  try {
+    const { program_id } = req.body;
+    if (!program_id) {
+      return res.status(400).json({ error: 'program_id is required' });
+    }
+
+    const program = ovenAdapter.startProgram(String(program_id));
+    res.json({
+      message: `Oven program "${program.name}" started. Target: ${program.temperature_celsius}°C`,
+      program,
+    });
+  } catch (error: any) {
+    res.status(400).json({ error: error?.message || 'Failed to start oven program' });
+  }
+});
+
+/**
+ * GET /api/cfr/hardware/espresso/telemetry
+ * Returns La Marzocco KB90 group temperatures, pressures, and backflushing due status.
+ */
+cfrRouter.get('/hardware/espresso/telemetry', (_req: Request, res: Response) => {
+  try {
+    const db = getDatabase();
+    const telemetry = espressoAdapter.getTelemetry(db);
+    res.json({ espresso_machine: telemetry });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to fetch espresso telemetry' });
+  }
+});
+
+/**
+ * GET /api/cfr/hardware/pager/logs
+ * Returns recent server wrist pager buzz logs.
+ */
+cfrRouter.get('/hardware/pager/logs', (req: Request, res: Response) => {
+  try {
+    const db = getDatabase();
+    const limit = req.query.limit ? Number(req.query.limit) : 20;
+    const logs = pagerAdapter.getLogs(db, limit);
+
+    res.json({ total: logs.length, logs });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to fetch pager logs' });
+  }
+});
+
+/**
+ * POST /api/cfr/hardware/pager/buzz
+ * Manually buzzes a floor server's wrist pager.
+ */
+cfrRouter.post('/hardware/pager/buzz', (req: Request, res: Response) => {
+  try {
+    const db = getDatabase();
+    const { message, table_number, server_name, order_id } = req.body;
+
+    if (!message || !message.trim()) {
+      return res.status(400).json({ error: 'message is required for pager buzz' });
+    }
+
+    const event = pagerAdapter.buzzPager(db, {
+      message: String(message),
+      tableNumber: table_number ? String(table_number) : undefined,
+      serverName: server_name ? String(server_name) : undefined,
+      orderId: order_id ? String(order_id) : undefined,
+    });
+
+    res.status(201).json({
+      message: 'Pager buzz alert dispatched',
+      event,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to buzz pager' });
+  }
+});
+
+/**
+ * GET /api/cfr/hardware/ambience/current
+ * Returns active lighting (DALI/Lutron) and audio (Sonos) scene.
+ */
+cfrRouter.get('/hardware/ambience/current', (_req: Request, res: Response) => {
+  try {
+    const preset = ambienceAdapter.getCurrentAmbience();
+    res.json({ ambience: preset });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to fetch current ambience' });
+  }
+});
+
+/**
+ * POST /api/cfr/hardware/ambience/override
+ * Sets a manual override scene (e.g. for private tasting events).
+ */
+cfrRouter.post('/hardware/ambience/override', (req: Request, res: Response) => {
+  try {
+    const { scene, duration_minutes = 60 } = req.body;
+    if (!scene || !['WORKSPACE', 'GOLDEN_HOUR', 'EVENING_LOUNGE'].includes(scene)) {
+      return res.status(400).json({
+        error: "scene must be one of 'WORKSPACE', 'GOLDEN_HOUR', or 'EVENING_LOUNGE'",
+      });
+    }
+
+    const updated = ambienceAdapter.setOverride(scene as CfrAmbienceScene, Number(duration_minutes));
+
+    res.json({
+      message: `Ambience override set to ${scene} for ${duration_minutes} minutes`,
+      ambience: updated,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to set ambience override' });
+  }
+});
+
+/**
+ * POST /api/cfr/hardware/ambience/clear
+ * Clears any manual override and reverts to time-of-day schedule.
+ */
+cfrRouter.post('/hardware/ambience/clear', (_req: Request, res: Response) => {
+  try {
+    const current = ambienceAdapter.clearOverride();
+    res.json({
+      message: 'Ambience override cleared. Reverted to scheduled scene.',
+      ambience: current,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to clear ambience override' });
+  }
+});
+
 
 
 

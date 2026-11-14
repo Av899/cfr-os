@@ -195,6 +195,67 @@ CREATE TABLE IF NOT EXISTS cfr_payments (
 
 CREATE INDEX IF NOT EXISTS idx_cfr_payments_order ON cfr_payments(order_id);
 CREATE INDEX IF NOT EXISTS idx_cfr_payments_status ON cfr_payments(status);
+
+-- Public Luxury Digital Menu Sections
+CREATE TABLE IF NOT EXISTS cfr_menu_sections (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  subtitle TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0
+);
+
+-- Public Luxury Digital Menu Items
+CREATE TABLE IF NOT EXISTS cfr_menu_items (
+  id TEXT PRIMARY KEY,
+  section_id TEXT NOT NULL REFERENCES cfr_menu_sections(id),
+  product_id TEXT,
+  name TEXT NOT NULL,
+  tagline TEXT,
+  price_paise INTEGER NOT NULL CHECK (price_paise % 1000 = 0),
+  description TEXT NOT NULL,
+  tasting_notes TEXT NOT NULL,
+  craft_story TEXT NOT NULL,
+  origin TEXT,
+  dietary_flags TEXT NOT NULL DEFAULT 'VEGAN,EGGLESS' CHECK (
+    dietary_flags NOT LIKE '%CONTAINS_EGG%' AND
+    dietary_flags NOT LIKE '%GELATIN%' AND
+    dietary_flags NOT LIKE '%ANIMAL_RENNET%' AND
+    dietary_flags NOT LIKE '%CARMINE%' AND
+    dietary_flags NOT LIKE '%MEAT_FISH%' AND
+    dietary_flags NOT LIKE '%LARD%'
+  ),
+  is_available INTEGER NOT NULL DEFAULT 1 CHECK (is_available IN (0, 1)),
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  calories INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_cfr_menu_items_section ON cfr_menu_items(section_id);
+
+-- Commercial Equipment Cleaning & Maintenance Tasks
+CREATE TABLE IF NOT EXISTS cfr_equipment_tasks (
+  id TEXT PRIMARY KEY,
+  equipment_type TEXT NOT NULL,
+  equipment_name TEXT NOT NULL,
+  task_name TEXT NOT NULL,
+  frequency TEXT NOT NULL DEFAULT 'DAILY_OPEN',
+  instructions TEXT NOT NULL,
+  is_completed INTEGER NOT NULL DEFAULT 0 CHECK (is_completed IN (0, 1)),
+  last_completed_at TEXT,
+  completed_by TEXT
+);
+
+-- Server Wrist Pager & Notification Logs
+CREATE TABLE IF NOT EXISTS cfr_pager_logs (
+  id TEXT PRIMARY KEY,
+  order_id TEXT,
+  table_number TEXT,
+  server_name TEXT,
+  message TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'SENT' CHECK (status IN ('QUEUED', 'SENT', 'DELIVERED', 'ACKNOWLEDGED')),
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_cfr_pager_logs_created ON cfr_pager_logs(created_at);
 `;
 
 /**
@@ -360,6 +421,14 @@ export function runCfrMigrations(db: Database.Database): void {
     seedStandardCoffeeSetup(db);
   } catch (err: any) {
     console.error('[CFR DB] Failed to seed coffee setup:', err?.message || err);
+  }
+
+  // 6. Seed standard CFR digital menu & equipment checklists if empty
+  try {
+    const { seedStandardMenuAndEquipment } = require('../menu/menu-engine');
+    seedStandardMenuAndEquipment(db);
+  } catch (err: any) {
+    console.error('[CFR DB] Failed to seed menu and equipment:', err?.message || err);
   }
 
   console.log(`${logPrefix} CFR schema v${CFR_SCHEMA_VERSION} initialized successfully.`);

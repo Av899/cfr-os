@@ -70,3 +70,4 @@ export interface CfrGrinder {
   remaining_capacity_kg?: number;
   status?: CfrBurrStatus;
 }
+

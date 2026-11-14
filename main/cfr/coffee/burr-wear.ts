@@ -108,3 +108,4 @@ export function resetGrinderBurrs(db: Database.Database, grinderId: string): Cfr
 
   return getPrimaryGrinder(db, grinderId);
 }
+
