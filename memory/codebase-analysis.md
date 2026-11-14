@@ -49,7 +49,7 @@ FloCafe is an **open-source, offline-first Electron desktop POS** system for caf
 - **Week 3**: Dynamic UPI QR Generator & Dual-Track Offline/Online Reconciler (12-digit Indian Bank UTR validation).
 - **Week 4**: Gram-Level BOM & FEFO (First-Expiry-First-Out) Inventory Engine (multi-lot cascading, sub-recipes, addon substitutions, waste tracking).
 - **Week 5**: Specialty Coffee Freshness & Dial-in Tracking (Roast age `days_off_roast`, degassing curves, barista morning dial-in logger with ratio/flow rate, commercial grinder burr wear & 500kg lifespan alerts, POS topbar freshness pill & dial-in modal).
-- Stock lot receiving with batch/lot numbers and expiry dates
+- **Week 6**: Luxury Guest Digital Menu & Hardware Adapters (Table QR mobile cream paper card with 7 signature sections & craft stories, real-time 86'd availability, Unox Combi preheat & wash checklists, La Marzocco KB90 backflush tracking, server wrist pager auto-buzz on KDS ready, DALI/Lutron & Sonos circadian ambience automation).
 
 ## Backend Analysis
 
